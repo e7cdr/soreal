@@ -7,14 +7,23 @@ echo ============================================
 echo.
 
 REM Check if Python virtual environment exists and has pip
-if not exist "Backend\venv\Scripts\pip.exe" (
+if not exist "Backend\soreal-env\Scripts\pip.exe" (
     echo [INFO] Python virtual environment not found or incomplete. Creating one now...
     REM Remove any broken venv
     if exist "Backend\venv" rmdir /s /q "Backend\venv"
+    if exist "Backend\soreal-env" rmdir /s /q "Backend\soreal-env"
     cd Backend
-    python -m venv venv
+    python -m venv --without-pip soreal-env
     if %ERRORLEVEL% NEQ 0 (
         echo [ERROR] Failed to create virtual environment.
+        cd ..
+        pause
+        exit /b 1
+    )
+    echo [INFO] Installing pip into virtual environment...
+    python -m pip install --target="soreal-env\Lib\site-packages" pip
+    if %ERRORLEVEL% NEQ 0 (
+        echo [ERROR] Failed to install pip into virtual environment.
         cd ..
         pause
         exit /b 1
@@ -25,7 +34,7 @@ if not exist "Backend\venv\Scripts\pip.exe" (
 REM Install/upgrade backend dependencies
 echo [INFO] Installing backend dependencies...
 cd Backend
-venv\Scripts\pip install -r requirements.txt
+soreal-env\Scripts\pip install -r requirements.txt
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Failed to install backend dependencies.
     cd ..
@@ -51,7 +60,7 @@ if not exist "Frontend\soreal\node_modules" (
 REM Run database migrations
 echo [INFO] Running database migrations...
 cd Backend
-venv\Scripts\python manage.py migrate --noinput
+soreal-env\Scripts\python manage.py migrate --noinput
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Database migration failed.
     cd ..
@@ -62,7 +71,7 @@ cd ..
 
 REM Start Django backend in a new window
 echo [INFO] Starting Django backend on http://localhost:8000...
-start "Soreal Backend" cmd /k "cd /d ""%~dp0\Backend"" && venv\Scripts\python manage.py runserver 0.0.0.0:8000"
+start "Soreal Backend" cmd /k "cd /d ""%~dp0\Backend"" && soreal-env\Scripts\python manage.py runserver 0.0.0.0:8000"
 
 REM Wait a moment for Django to start
 timeout /t 3 >nul
