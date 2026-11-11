@@ -6,17 +6,20 @@ echo  SOREAL - Startup Script
 echo ============================================
 echo.
 
-REM Check if Python virtual environment exists
-if not exist "Backend\venv\Scripts\python.exe" (
-    echo [INFO] Python virtual environment not found. Creating one now...
+REM Check if Python virtual environment exists and has pip
+if not exist "Backend\venv\Scripts\pip.exe" (
+    echo [INFO] Python virtual environment not found or incomplete. Creating one now...
+    REM Remove any broken venv
+    if exist "Backend\venv" rmdir /s /q "Backend\venv"
     cd Backend
     python -m venv venv
-    cd ..
-    if not exist "Backend\venv\Scripts\python.exe" (
+    if %ERRORLEVEL% NEQ 0 (
         echo [ERROR] Failed to create virtual environment.
+        cd ..
         pause
         exit /b 1
     )
+    cd ..
 )
 
 REM Install/upgrade backend dependencies
