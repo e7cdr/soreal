@@ -11,6 +11,7 @@ from .models import (
     Lead,
     LeadLeadMatch,
     LeadMatch,
+    MarketingPost,
     Project,
     ProjectUnit,
     ProjectBulkUpload,
@@ -535,3 +536,31 @@ class LocationStatsSerializer(serializers.Serializer):
     province = serializers.CharField(allow_null=True)
     count = serializers.IntegerField()
     avg_price = serializers.DecimalField(max_digits=14, decimal_places=2, allow_null=True)
+
+
+class MarketingPostSerializer(serializers.ModelSerializer):
+    """Serializer for marketing/social media posts."""
+
+    estate_title = serializers.CharField(source="estate.title", read_only=True, allow_null=True)
+    estate_slug = serializers.CharField(source="estate.slug", read_only=True, allow_null=True)
+
+    class Meta:
+        model = MarketingPost
+        fields = [
+            "id",
+            "title",
+            "caption",
+            "platform",
+            "status",
+            "scheduled_for",
+            "posted_at",
+            "estate",
+            "estate_title",
+            "estate_slug",
+            "media_url",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["posted_at", "created_at", "updated_at"]
+

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Building2,
+  Calendar,
   ChartNoAxesCombined,
   ChevronDown,
   CircleHelp,
@@ -74,6 +75,7 @@ export default function Navigation() {
     { href: "/owners", label: "owners", icon: Users },
     { href: "/data-quality", label: "dataQuality", icon: ChartNoAxesCombined },
     { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
+    { href: "/marketing/calendar", label: "marketingCalendar", icon: Calendar },
     {
       href: "/lead-matches",
       label: "leadMatches",

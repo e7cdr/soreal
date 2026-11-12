@@ -17,6 +17,7 @@ from .viewsets import (
     ProjectUnitViewSet,
     AnalyticsViewSet,
     WhatsAppImportViewSet,
+    MarketingPostViewSet,
 )
 from .social_post import SocialPostDownloadView
 
@@ -40,6 +41,7 @@ router.register(r"projects", ProjectViewSet, basename="estate-project")
 router.register(r"project-units", ProjectUnitViewSet, basename="estate-project-unit")
 router.register(r"analytics", AnalyticsViewSet, basename="estate-analytics")
 router.register(r"whatsapp-import", WhatsAppImportViewSet, basename="estate-whatsapp-import")
+router.register(r"marketing-posts", MarketingPostViewSet, basename="estate-marketing-post")
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -919,3 +919,52 @@ class ProjectBulkUpload(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Project Bulk Upload"
         verbose_name_plural = "Project Bulk Uploads"
+
+
+class MarketingPost(models.Model):
+    """A planned social media post for promoting an estate or general content."""
+
+    PLATFORM_CHOICES = [
+        ("instagram", "Instagram"),
+        ("facebook", "Facebook"),
+        ("whatsapp", "WhatsApp Status"),
+    ]
+
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("scheduled", "Scheduled"),
+        ("posted", "Posted"),
+    ]
+
+    title = models.CharField(max_length=255, blank=True, null=True)
+    caption = models.TextField(blank=True, null=True)
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES, default="instagram")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    scheduled_for = models.DateTimeField(blank=True, null=True)
+    posted_at = models.DateTimeField(blank=True, null=True)
+    estate = models.ForeignKey(
+        Property, on_delete=models.SET_NULL, null=True, blank=True, related_name="marketing_posts"
+    )
+    media_url = models.URLField(blank=True, null=True)
+    created_by = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("caption"),
+        FieldPanel("platform"),
+        FieldPanel("status"),
+        FieldPanel("scheduled_for"),
+        FieldPanel("estate"),
+        FieldPanel("media_url"),
+    ]
+
+    def __str__(self):
+        return f"{self.platform}: {self.title or self.caption[:50] or ''} ({self.status})"
+
+    class Meta:
+        ordering = ["-scheduled_for", "-created_at"]
+        verbose_name = "Marketing Post"
+        verbose_name_plural = "Marketing Posts"
+

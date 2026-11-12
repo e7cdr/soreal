@@ -26,6 +26,7 @@ from .models import (
     Lead,
     LeadLeadMatch,
     LeadMatch,
+    MarketingPost,
     Broker,
     Owner,
     ScanInboxItem,
@@ -46,6 +47,7 @@ from .serializers import (
     ScanInboxItemSerializer,
     ProjectSerializer,
     ProjectUnitSerializer,
+    MarketingPostSerializer,
 )
 from .matching import (
     create_matches_for_lead,
@@ -1790,3 +1792,41 @@ class WhatsAppImportViewSet(viewsets.ViewSet):
                 shutil.rmtree(extract_dir, ignore_errors=True)
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
+
+
+class MarketingPostViewSet(viewsets.ModelViewSet):
+    """Staff-managed social media marketing posts."""
+
+    serializer_class = MarketingPostSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return MarketingPost.objects.none()
+        queryset = MarketingPost.objects.all()
+        platform = self.request.query_params.get("platform")
+        status = self.request.query_params.get("status")
+        if platform:
+            queryset = queryset.filter(platform=platform)
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset.order_by("-scheduled_for", "-created_at")
+
+    def perform_create(self, serializer):
+        if not _is_staff(self.request):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Staff access required.")
+        serializer.save(created_by=self.request.user.username if self.request.user.is_authenticated else "")
+
+    def perform_update(self, serializer):
+        if not _is_staff(self.request):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Staff access required.")
+        instance = serializer.save()
+        if instance.status == "posted" and not instance.posted_at:
+            from django.utils import timezone
+            instance.posted_at = timezone.now()
+            instance.save(update_fields=["posted_at"])
+

@@ -569,3 +569,32 @@ export async function importWhatsAppChat(formData) {
     body: formData,
   });
 }
+
+// Marketing posts
+export async function fetchMarketingPosts(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.platform) searchParams.append("platform", params.platform);
+  if (params.status) searchParams.append("status", params.status);
+  if (params.page) searchParams.append("page", params.page);
+  return apiFetch(`/api/estates/marketing-posts/?${searchParams.toString()}`);
+}
+
+export async function createMarketingPost(data) {
+  return apiFetch("/api/estates/marketing-posts/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMarketingPost(postId, data) {
+  return apiFetch(`/api/estates/marketing-posts/${postId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMarketingPost(postId) {
+  return apiFetch(`/api/estates/marketing-posts/${postId}/`, {
+    method: "DELETE",
+  });
+}
