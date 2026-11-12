@@ -270,6 +270,31 @@ class PropertyInquiryViewSet(viewsets.ModelViewSet):
                 fail_silently=True,
             )
 
+        # Create a Lead from the inquiry so it appears in the request queue
+        try:
+            estate = inquiry.property
+            Lead.objects.create(
+                name=inquiry.name,
+                phone=inquiry.phone or "",
+                source_sender=inquiry.name,
+                source="inquiry",
+                listing_type=estate.listing_type or "any",
+                property_type=estate.property_type or "",
+                min_price=estate.price,
+                max_price=estate.price,
+                currency=estate.currency or "USD",
+                bedrooms=estate.bedrooms,
+                bathrooms=estate.bathrooms,
+                preferred_location=estate.address or "",
+                city=estate.city or "",
+                province=estate.province or "",
+                notes=inquiry.message or "",
+                status="new",
+            )
+        except Exception:
+            # Lead creation must never block inquiry submission
+            pass
+
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def screen(self, request, pk=None):
         """Manually run blacklist screening on an inquiry."""
