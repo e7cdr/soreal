@@ -310,6 +310,14 @@ export const translations = {
     sending: "Sending...",
     send: "Send Inquiry",
 
+    // Marketing / Sharing
+    whatsappContact: "Contact via WhatsApp",
+    whatsappContactEstate: "Ask about {{title}}",
+    whatsappContactRequest: "I saw your request for {{type}} in {{location}}",
+    shareFacebook: "Share on Facebook",
+    shareFacebookTitle: "Check out this property on SOREAL",
+    viewOriginal: "View original listing",
+
     // Blacklist
     listaNegra: "Lista Negra",
     totalCases: "Total Cases",
@@ -810,6 +818,14 @@ export const translations = {
     anyQuestions: "¿Alguna pregunta sobre esta propiedad?",
     sending: "Enviando...",
     send: "Enviar Consulta",
+
+    // Marketing / Sharing
+    whatsappContact: "Contactar por WhatsApp",
+    whatsappContactEstate: "Preguntar por {{title}}",
+    whatsappContactRequest: "Vi tu solicitud de {{type}} en {{location}}",
+    shareFacebook: "Compartir en Facebook",
+    shareFacebookTitle: "Mira esta propiedad en SOREAL",
+    viewOriginal: "Ver listado original",
 
     // Blacklist
     listaNegra: "Lista Negra",

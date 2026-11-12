@@ -9,6 +9,22 @@ import {
 import { Heart } from "lucide-react";
 import StaleBadge from "@/app/components/StaleBadge";
 
+function normalizePhoneForWhatsApp(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  if (!digits.startsWith("1")) {
+    return `1${digits}`;
+  }
+  return digits;
+}
+
+function buildWhatsAppUrl(phone, text) {
+  const normalized = normalizePhoneForWhatsApp(phone);
+  if (!normalized) return null;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
 export default function PropertyCard({ property }) {
   const { translate: t } = useTranslation();
   const [isFav, setIsFav] = useState(false);
@@ -76,6 +92,17 @@ export default function PropertyCard({ property }) {
         <p className="font-bold mt-1">
           {property.currency} {property.price.toLocaleString()}
         </p>
+      )}
+      {property.phone && (
+        <a
+          href={buildWhatsAppUrl(property.phone, t("whatsappContactEstate", { title: property.title })) || "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+        >
+          <span className="text-green-600">📱</span>
+          {t("whatsappContact")}
+        </a>
       )}
     </article>
   );

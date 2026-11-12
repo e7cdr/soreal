@@ -24,6 +24,23 @@ const PropertyMap = dynamic(
   { ssr: false, loading: () => <div className="w-full h-[400px] bg-gray-200 rounded-lg animate-pulse" /> }
 );
 
+function normalizePhoneForWhatsApp(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  // Dominican Republic country code: 1 (809, 829, 849)
+  if (!digits.startsWith("1")) {
+    return `1${digits}`;
+  }
+  return digits;
+}
+
+function buildWhatsAppUrl(phone, text) {
+  const normalized = normalizePhoneForWhatsApp(phone);
+  if (!normalized) return null;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
 export default function EstateDetailClient({ estate }) {
   const { translate: t } = useTranslation();
   const coverImage =
@@ -217,6 +234,33 @@ export default function EstateDetailClient({ estate }) {
               title="Download Social Media Post"
             >
               <span className="text-blue-600">📱</span>
+            </button>
+            {estate.phone && (
+              <a
+                href={buildWhatsAppUrl(estate.phone, t("whatsappContactEstate", { title: estate.title })) || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-green-100 rounded hover:bg-green-200"
+                title={t("whatsappContact")}
+              >
+                <span className="text-green-600">📱</span>
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                window.open(
+                  `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                    typeof window !== "undefined" ? window.location.href : ""
+                  )}`,
+                  "_blank",
+                  "width=600,height=400"
+                );
+              }}
+              className="p-2 bg-blue-100 rounded hover:bg-blue-200"
+              title={t("shareFacebook")}
+            >
+              <span className="text-blue-600">👍</span>
             </button>
           </div>
           {editing && estateDraft && (

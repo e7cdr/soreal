@@ -45,6 +45,22 @@ function listingIntentBadge(listingType, t) {
   return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
 }
 
+function normalizePhoneForWhatsApp(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  if (!digits.startsWith("1")) {
+    return `1${digits}`;
+  }
+  return digits;
+}
+
+function buildWhatsAppUrl(phone, text) {
+  const normalized = normalizePhoneForWhatsApp(phone);
+  if (!normalized) return null;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+}
+
 function toForm(lead) {
   return Object.fromEntries(
     EDITABLE_FIELDS.map((field) => [field, lead[field] ?? ""]),
@@ -303,6 +319,18 @@ export default function RequestDetailPage() {
             <ArrowLeft size={16} />
             {t("backToRequests")}
           </Link>
+          {lead.phone && (
+            <a
+              href={buildWhatsAppUrl(lead.phone, t("whatsappContactRequest", { type: lead.listing_type || t("property"), location: lead.city || lead.preferred_location || "" })) || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="toolbar-button"
+              title={t("whatsappContact")}
+            >
+              <span className="text-green-600">📱</span>
+              {t("whatsappContact")}
+            </a>
+          )}
           {lead.source === "whatsapp" && (
             <button
               type="button"
