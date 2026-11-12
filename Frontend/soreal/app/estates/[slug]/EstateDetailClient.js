@@ -17,6 +17,13 @@ import {
   removeFavorite,
 } from "@/lib/favorites";
 import { Heart } from "lucide-react";
+import {
+  STORYTELLING_TEMPLATES,
+  PROPERTY_TYPE_TEMPLATES,
+  STORY_ANGLES,
+  getTemplateForPersona,
+  renderTemplate,
+} from "@/lib/storytelling-templates";
 import { DOMINICAN_CITIES, DOMINICAN_PROVINCES } from "@/lib/locations";
 
 const PropertyMap = dynamic(
@@ -62,6 +69,8 @@ export default function EstateDetailClient({ estate }) {
   const [estateDraft, setEstateDraft] = useState(null);
   const [brokers, setBrokers] = useState([]);
   const [owners, setOwners] = useState([]);
+  const [storyTemplate, setStoryTemplate] = useState(null);
+  const [showStoryHelper, setShowStoryHelper] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -96,6 +105,16 @@ export default function EstateDetailClient({ estate }) {
     setEditing(true);
     fetchBrokers().then((response) => setBrokers(response.results || [])).catch((loadError) => setError(loadError.message));
     fetchOwners().then((response) => setOwners(response.results || [])).catch((loadError) => setError(loadError.message));
+  }
+
+  function applyStoryTemplate(template) {
+    const rendered = renderTemplate(template, estateDraft);
+    setEstateDraft((prev) => ({
+      ...prev,
+      description: rendered,
+    }));
+    setStoryTemplate(template);
+    setShowStoryHelper(false);
   }
 
   async function saveEstateChanges(event) {
@@ -329,6 +348,50 @@ export default function EstateDetailClient({ estate }) {
                   </label>
                 );
               })}
+              {estateDraft.persona_name && (
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold">{t("storytellingHelper")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowStoryHelper((prev) => !prev)}
+                      className="text-xs text-[var(--text-muted)] hover:underline"
+                    >
+                      {showStoryHelper ? t("hideHelper") : t("showHelper")}
+                    </button>
+                  </div>
+                  {showStoryHelper && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-[var(--text-muted)]">
+                        {t("personaSelected", { name: estateDraft.persona_name })}
+                      </p>
+                      {Object.entries(STORYTELLING_TEMPLATES).map(([key, tmpl]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => applyStoryTemplate(tmpl)}
+                          className="w-full text-left text-xs text-[var(--foreground)] hover:bg-[var(--surface-muted)] p-2 rounded border border-transparent hover:border-[var(--border)]"
+                        >
+                          <span className="font-semibold">{tmpl.name}</span>
+                          <span className="block text-[var(--text-muted)] text-[10px] mt-0.5">
+                            {t("storyAngle")}: {tmpl.useCases.join(", ")}
+                          </span>
+                        </button>
+                      ))}
+                      <div className="pt-2 border-t border-[var(--border)]">
+                        <span className="text-xs font-medium text-[var(--text-muted)] block mb-1">
+                          {t("storyAngles")}
+                        </span>
+                        {Object.entries(STORY_ANGLES).map(([key, desc]) => (
+                          <p key={key} className="text-xs text-[var(--text-muted)] mb-1">
+                            <span className="font-semibold">{key}:</span> {desc}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <label className="block text-sm"><span className="mb-1 block font-medium">{t("description")}</span><textarea rows={4} value={estateDraft.description} onChange={(event) => setEstateDraft({ ...estateDraft, description: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" /></label>
               <button disabled={savingEstate} className="rounded-lg bg-[var(--green)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{savingEstate ? t("saving") : t("saveChanges")}</button>
             </form>
