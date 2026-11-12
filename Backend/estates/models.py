@@ -116,6 +116,35 @@ class Property(ClusterableModel):
         help_text="draft, verified, or rejected",
     )
 
+    # Buyer persona / ideal customer profiling
+    persona_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Ideal customer persona (e.g., Young Family, Investor, Retiree).",
+    )
+    persona_demographics = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Age range, budget, preferred location, bedrooms.",
+    )
+    persona_motivations = models.TextField(
+        blank=True,
+        null=True,
+        help_text="What drives this buyer (e.g., first home, investment, retirement).",
+    )
+    persona_objections = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Common objections and how to address them.",
+    )
+    persona_marketing_angle = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Storytelling hook and ad copy angle for this persona.",
+    )
+
     property_type = models.CharField(
         max_length=30, choices=PROPERTY_TYPE_CHOICES, default="house"
     )
@@ -196,6 +225,16 @@ class Property(ClusterableModel):
                 FieldPanel("source_status"),
             ],
             heading="Source Attribution",
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("persona_name"),
+                FieldPanel("persona_demographics"),
+                FieldPanel("persona_motivations"),
+                FieldPanel("persona_objections"),
+                FieldPanel("persona_marketing_angle"),
+            ],
+            heading="Buyer Persona",
         ),
         MultiFieldPanel(
             [

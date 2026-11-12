@@ -86,6 +86,11 @@ export default function EstateDetailClient({ estate }) {
       status: estate.status || "draft",
       broker: estate.broker || "",
       owner: estate.owner || "",
+      persona_name: estate.persona_name || "",
+      persona_demographics: estate.persona_demographics || "",
+      persona_motivations: estate.persona_motivations || "",
+      persona_objections: estate.persona_objections || "",
+      persona_marketing_angle: estate.persona_marketing_angle || "",
     });
     setError(null);
     setEditing(true);
@@ -279,6 +284,11 @@ export default function EstateDetailClient({ estate }) {
                 ["address", t("address"), "text"],
                 ["province", t("province"), "province"],
                 ["city", t("city"), "city"],
+                ["persona_name", t("personaName"), "text"],
+                ["persona_demographics", t("personaDemographics"), "text"],
+                ["persona_motivations", t("personaMotivations"), "textarea"],
+                ["persona_objections", t("personaObjections"), "textarea"],
+                ["persona_marketing_angle", t("personaMarketingAngle"), "textarea"],
                 ["broker", t("brokerName"), "broker"],
                 ["owner", t("owner"), "owner"],
               ].map(([field, label, type]) => {
@@ -306,6 +316,13 @@ export default function EstateDetailClient({ estate }) {
                         {estateDraft[field] && !options.some((option) => String(option.value) === String(estateDraft[field])) && <option value={estateDraft[field]}>{estateDraft[field]}</option>}
                         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                       </select>
+                    ) : type === "textarea" ? (
+                      <textarea
+                        rows={3}
+                        value={estateDraft[field]}
+                        onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })}
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
+                      />
                     ) : (
                       <input type={type} min={type === "number" ? "0" : undefined} step={field === "price" ? "0.01" : "1"} value={estateDraft[field]} onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" />
                     )}
