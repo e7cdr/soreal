@@ -23,6 +23,7 @@ from .models import (
     TenantApplication,
     SavedSearch,
     Lead,
+    LeadLeadMatch,
     LeadMatch,
     Broker,
     Owner,
@@ -37,6 +38,7 @@ from .serializers import (
     TenantApplicationSerializer,
     SavedSearchSerializer,
     LeadSerializer,
+    LeadLeadMatchSerializer,
     LeadMatchSerializer,
     BrokerSerializer,
     OwnerSerializer,
@@ -44,7 +46,11 @@ from .serializers import (
     ProjectSerializer,
     ProjectUnitSerializer,
 )
-from .matching import create_matches_for_lead, create_matches_for_property
+from .matching import (
+    create_matches_for_lead,
+    create_matches_for_lead_lead,
+    create_matches_for_property,
+)
 
 
 def _is_staff(request):
@@ -719,6 +725,14 @@ class LeadViewSet(viewsets.ModelViewSet):
         lead = serializer.save()
         # Auto-match against existing properties
         create_matches_for_lead(lead)
+        # Auto-match against other leads
+        create_matches_for_lead_lead(lead)
+
+    def perform_update(self, serializer):
+        lead = serializer.save()
+        # Re-run matching when lead is edited (e.g., typo corrections)
+        create_matches_for_lead(lead)
+        create_matches_for_lead_lead(lead)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def match(self, request, pk=None):
@@ -910,6 +924,55 @@ class LeadMatchViewSet(viewsets.ModelViewSet):
         match.save()
         serializer = LeadMatchSerializer(match)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    def pending_count(self, request):
+        """Return count of pending lead-property matches."""
+        count = LeadMatch.objects.filter(status="pending").count()
+        return Response({"pending_count": count})
+
+
+class LeadLeadMatchViewSet(viewsets.ModelViewSet):
+    """
+    API for lead-lead matches.
+
+    Staff can LIST, VIEW, and UPDATE match status
+    (pending, notified, contacted, dismissed).
+    """
+
+    queryset = LeadLeadMatch.objects.select_related("lead_a", "lead_b")
+    serializer_class = LeadLeadMatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return LeadLeadMatch.objects.none()
+        return super().get_queryset()
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def notify(self, request, pk=None):
+        """Mark a match as notified."""
+        match = self.get_object()
+        match.status = "notified"
+        match.notified_at = timezone.now()
+        match.save()
+        serializer = LeadLeadMatchSerializer(match)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    def dismiss(self, request, pk=None):
+        """Dismiss a match."""
+        match = self.get_object()
+        match.status = "dismissed"
+        match.save()
+        serializer = LeadLeadMatchSerializer(match)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
+    def pending_count(self, request):
+        """Return count of pending lead-lead matches."""
+        count = LeadLeadMatch.objects.filter(status="pending").count()
+        return Response({"pending_count": count})
 
 
 class ProjectViewSet(viewsets.ModelViewSet):

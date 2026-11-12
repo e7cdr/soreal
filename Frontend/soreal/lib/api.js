@@ -382,6 +382,33 @@ export async function dismissLeadMatch(matchId) {
   });
 }
 
+export async function fetchLeadLeadMatches(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.append("page", params.page);
+  if (params.status) searchParams.append("status", params.status);
+  return apiFetch(`/api/estates/lead-lead-matches/?${searchParams.toString()}`);
+}
+
+export async function notifyLeadLeadMatch(matchId) {
+  return apiFetch(`/api/estates/lead-lead-matches/${matchId}/notify/`, {
+    method: "POST",
+  });
+}
+
+export async function dismissLeadLeadMatch(matchId) {
+  return apiFetch(`/api/estates/lead-lead-matches/${matchId}/dismiss/`, {
+    method: "POST",
+  });
+}
+
+export async function fetchPendingMatchCount() {
+  const [propRes, leadRes] = await Promise.all([
+    apiFetch("/api/estates/lead-matches/pending-count/"),
+    apiFetch("/api/estates/lead-lead-matches/pending-count/"),
+  ]);
+  return (propRes?.pending_count || 0) + (leadRes?.pending_count || 0);
+}
+
 export async function fetchEstates(params = {}) {
   const searchParams = new URLSearchParams();
   if (params.q) searchParams.append("q", params.q);

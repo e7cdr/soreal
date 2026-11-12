@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Building2,
   ChartNoAxesCombined,
   ChevronDown,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import { fetchPendingMatchCount } from "@/lib/api";
 
 const primaryLinks = [
   { href: "/", label: "home", icon: Home },
@@ -31,26 +33,13 @@ const primaryLinks = [
   { href: "/analytics", label: "analytics", icon: ChartNoAxesCombined },
 ];
 
-const moreLinks = [
-  { href: "/favorites", label: "favorites", icon: Heart },
-  { href: "/report", label: "submitReport", icon: FilePlus2 },
-  { href: "/requests", label: "requestQueue", icon: ListChecks },
-  { href: "/brokers", label: "brokers", icon: Users },
-  { href: "/owners", label: "owners", icon: Users },
-  { href: "/data-quality", label: "dataQuality", icon: ChartNoAxesCombined },
-  { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
-  { href: "/lead-matches", label: "leadMatches", icon: ChartNoAxesCombined },
-  { href: "/whatsapp-import", label: "whatsappImport", icon: FilePlus2 },
-  { href: "/about", label: "about", icon: CircleHelp },
-  { href: "/account", label: "account", icon: Users },
-];
-
 export default function Navigation() {
   const pathname = usePathname();
   const { lang, changeLanguage, translate } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const [hasAuth, setHasAuth] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingMatches, setPendingMatches] = useState(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -62,10 +51,43 @@ export default function Navigation() {
     setMenuOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    let active = true;
+    fetchPendingMatchCount()
+      .then((count) => {
+        if (active) setPendingMatches(count);
+      })
+      .catch(() => {
+        // Ignore errors; badge stays at 0
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const moreLinks = [
+    { href: "/favorites", label: "favorites", icon: Heart },
+    { href: "/report", label: "submitReport", icon: FilePlus2 },
+    { href: "/requests", label: "requestQueue", icon: ListChecks },
+    { href: "/brokers", label: "brokers", icon: Users },
+    { href: "/owners", label: "owners", icon: Users },
+    { href: "/data-quality", label: "dataQuality", icon: ChartNoAxesCombined },
+    { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
+    {
+      href: "/lead-matches",
+      label: "leadMatches",
+      icon: ChartNoAxesCombined,
+      badge: pendingMatches,
+    },
+    { href: "/whatsapp-import", label: "whatsappImport", icon: FilePlus2 },
+    { href: "/about", label: "about", icon: CircleHelp },
+    { href: "/account", label: "account", icon: Users },
+  ];
+
   const isActive = (href) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const renderLink = ({ href, label, icon: Icon }) => (
+  const renderLink = ({ href, label, icon: Icon, badge }) => (
     <Link
       key={href}
       href={href}
@@ -74,6 +96,11 @@ export default function Navigation() {
     >
       <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
       <span>{translate(label)}</span>
+      {badge > 0 && (
+        <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-600 text-white text-[10px] font-bold">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 

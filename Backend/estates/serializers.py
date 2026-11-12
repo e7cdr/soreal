@@ -9,6 +9,7 @@ from .models import (
     TenantApplication,
     SavedSearch,
     Lead,
+    LeadLeadMatch,
     LeadMatch,
     Project,
     ProjectUnit,
@@ -349,6 +350,45 @@ class LeadMatchSerializer(serializers.ModelSerializer):
 
     def get_property_slug(self, obj):
         return obj.property.slug
+
+
+class LeadLeadMatchSerializer(serializers.ModelSerializer):
+    """Serializer for lead-lead matches."""
+
+    lead_a_name = serializers.SerializerMethodField()
+    lead_a_phone = serializers.SerializerMethodField()
+    lead_b_name = serializers.SerializerMethodField()
+    lead_b_phone = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LeadLeadMatch
+        fields = [
+            "id",
+            "lead_a",
+            "lead_a_name",
+            "lead_a_phone",
+            "lead_b",
+            "lead_b_name",
+            "lead_b_phone",
+            "match_score",
+            "match_reasons",
+            "status",
+            "notified_at",
+            "created_at",
+        ]
+        read_only_fields = ["lead_a", "lead_b", "match_score", "match_reasons", "created_at"]
+
+    def get_lead_a_name(self, obj):
+        return obj.lead_a.name
+
+    def get_lead_a_phone(self, obj):
+        return obj.lead_a.phone
+
+    def get_lead_b_name(self, obj):
+        return obj.lead_b.name
+
+    def get_lead_b_phone(self, obj):
+        return obj.lead_b.phone
 
 
 class ProjectUnitSerializer(serializers.ModelSerializer):

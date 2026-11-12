@@ -7,6 +7,7 @@ from .viewsets import (
     TenantApplicationViewSet,
     SavedSearchViewSet,
     LeadViewSet,
+    LeadLeadMatchViewSet,
     LeadMatchViewSet,
     BrokerViewSet,
     OwnerViewSet,
@@ -26,6 +27,11 @@ router.register(r"applications", TenantApplicationViewSet, basename="estate-appl
 router.register(r"saved-searches", SavedSearchViewSet, basename="estate-saved-search")
 router.register(r"leads", LeadViewSet, basename="estate-lead")
 router.register(r"lead-matches", LeadMatchViewSet, basename="estate-lead-match")
+router.register(
+    r"lead-lead-matches",
+    LeadLeadMatchViewSet,
+    basename="estate-lead-lead-match",
+)
 router.register(r"brokers", BrokerViewSet, basename="estate-broker")
 router.register(r"owners", OwnerViewSet, basename="estate-owner")
 router.register(r"data-quality", DataQualityViewSet, basename="estate-data-quality")

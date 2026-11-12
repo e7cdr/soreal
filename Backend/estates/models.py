@@ -635,6 +635,62 @@ class LeadMatch(models.Model):
 
 
 @register_snippet
+class LeadLeadMatch(models.Model):
+    """A match between two leads looking for similar properties."""
+
+    MATCH_STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("notified", "Notified"),
+        ("contacted", "Contacted"),
+        ("dismissed", "Dismissed"),
+    ]
+
+    lead_a = models.ForeignKey(
+        Lead, on_delete=models.CASCADE, related_name="lead_matches_a"
+    )
+    lead_b = models.ForeignKey(
+        Lead, on_delete=models.CASCADE, related_name="lead_matches_b"
+    )
+    match_score = models.IntegerField(
+        default=0,
+        help_text="Higher score = better match (0-100)",
+    )
+    match_reasons = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text="Why these two leads match",
+    )
+    status = models.CharField(
+        max_length=20, choices=MATCH_STATUS_CHOICES, default="pending"
+    )
+    notified_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    panels = [
+        FieldPanel("lead_a", read_only=True),
+        FieldPanel("lead_b", read_only=True),
+        FieldPanel("match_score", read_only=True),
+        FieldPanel("match_reasons", read_only=True),
+        FieldPanel("status"),
+        FieldPanel("notified_at", read_only=True),
+    ]
+
+    def __str__(self):
+        return f"Lead Match: {self.lead_a.name} ↔ {self.lead_b.name}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Lead-Lead Match"
+        verbose_name_plural = "Lead-Lead Matches"
+        unique_together = ["lead_a", "lead_b"]
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(lead_a=models.F("lead_b")),
+                name="lead_a_not_equal_lead_b",
+            ),
+        ]
+
+
+@register_snippet
 class Project(models.Model):
     """A real estate development project with multiple units for sale/rent."""
 
