@@ -171,6 +171,16 @@ export default function Navigation() {
           </nav>
 
           <div className="header-actions">
+            {!hasAuth && (
+              <Link
+                href="/login"
+                className="header-icon-button staff-login"
+                title={translate("staffLogin")}
+                aria-label={translate("staffLogin")}
+              >
+                <LogIn size={18} />
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => changeLanguage(lang === "en" ? "es" : "en")}

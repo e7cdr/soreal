@@ -255,6 +255,17 @@ textarea:focus-visible {
   font-weight: 750;
 }
 
+.staff-login {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.staff-login:hover {
+  background: var(--green-dark, #1d7a3c);
+  border-color: var(--green-dark, #1d7a3c);
+}
+
 .mobile-menu-toggle {
   display: none;
 }
