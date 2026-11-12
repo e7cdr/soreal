@@ -321,10 +321,42 @@ export default function EstateDetailClient({ estate }) {
           )}
         </div>
 
+        {estate.source_lead && (
+          <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded">
+                {t("sourceRequest")}
+              </span>
+              <Link
+                href={`/requests/${estate.source_lead.id}`}
+                className="text-xs font-medium text-[var(--text-muted)] hover:underline"
+              >
+                {t("viewRequest")}
+              </Link>
+            </div>
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">{estate.source_lead.name || t("unknownRequester")}</p>
+              {estate.source_lead.phone && (
+                <p className="text-[var(--text-muted)]">
+                  {estate.source_lead.phone}
+                </p>
+              )}
+              {estate.source_lead.whatsapp_group && (
+                <p className="text-[var(--text-muted)]">
+                  {estate.source_lead.whatsapp_group}
+                </p>
+              )}
+              <p className="text-xs text-[var(--text-muted)]">
+                {t("sourceRequestDescription")}
+              </p>
+            </div>
+          </div>
+        )}
+
         <div>
           {estate.description && (
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">Description</h2>
+              <h2 className="text-xl font-bold mb-2">{t("description")}</h2>
               <div
                 className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: estate.description }}

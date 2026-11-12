@@ -39,6 +39,12 @@ const EDITABLE_FIELDS = [
   "notes",
 ];
 
+function buyIntentBadge(listingType, t) {
+  if (listingType === "sale") return { label: t("buying"), color: "text-green-700 bg-green-100" };
+  if (listingType === "rent") return { label: t("renting"), color: "text-blue-700 bg-blue-100" };
+  return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
+}
+
 function toForm(lead) {
   return Object.fromEntries(
     EDITABLE_FIELDS.map((field) => [field, lead[field] ?? ""]),
@@ -309,6 +315,13 @@ export default function RequestDetailPage() {
         </>
       )}
     >
+
+      <div className="mb-3 flex items-center gap-2">
+        <span className={`rounded-md px-2 py-1 ${buyIntentBadge(lead.listing_type, t).color}`}>
+          {buyIntentBadge(lead.listing_type, t).label}
+        </span>
+        <span className="text-xs text-[var(--text-muted)]">{t("buyIntent")}</span>
+      </div>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
