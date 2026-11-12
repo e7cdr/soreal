@@ -598,3 +598,32 @@ export async function deleteMarketingPost(postId) {
     method: "DELETE",
   });
 }
+
+// Ad campaigns
+export async function fetchAdCampaigns(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.objective) searchParams.append("objective", params.objective);
+  if (params.status) searchParams.append("status", params.status);
+  if (params.page) searchParams.append("page", params.page);
+  return apiFetch(`/api/estates/ad-campaigns/?${searchParams.toString()}`);
+}
+
+export async function createAdCampaign(data) {
+  return apiFetch("/api/estates/ad-campaigns/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateAdCampaign(campaignId, data) {
+  return apiFetch(`/api/estates/ad-campaigns/${campaignId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAdCampaign(campaignId) {
+  return apiFetch(`/api/estates/ad-campaigns/${campaignId}/`, {
+    method: "DELETE",
+  });
+}

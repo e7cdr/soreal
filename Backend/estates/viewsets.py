@@ -27,6 +27,7 @@ from .models import (
     LeadLeadMatch,
     LeadMatch,
     MarketingPost,
+    AdCampaign,
     Broker,
     Owner,
     ScanInboxItem,
@@ -48,6 +49,7 @@ from .serializers import (
     ProjectSerializer,
     ProjectUnitSerializer,
     MarketingPostSerializer,
+    AdCampaignSerializer,
 )
 from .matching import (
     create_matches_for_lead,
@@ -1858,4 +1860,30 @@ class MarketingPostViewSet(viewsets.ModelViewSet):
             from django.utils import timezone
             instance.posted_at = timezone.now()
             instance.save(update_fields=["posted_at"])
+
+
+class AdCampaignViewSet(viewsets.ModelViewSet):
+    """Staff-managed paid social media campaign planner."""
+
+    serializer_class = AdCampaignSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return AdCampaign.objects.none()
+        queryset = AdCampaign.objects.all()
+        objective = self.request.query_params.get("objective")
+        status = self.request.query_params.get("status")
+        if objective:
+            queryset = queryset.filter(objective=objective)
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        if not _is_staff(self.request):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Staff access required.")
+        serializer.save(created_by=self.request.user.username if self.request.user.is_authenticated else "")
 

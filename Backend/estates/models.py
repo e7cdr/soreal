@@ -1051,3 +1051,66 @@ class MarketingPost(models.Model):
         verbose_name = "Marketing Post"
         verbose_name_plural = "Marketing Posts"
 
+
+class AdCampaign(models.Model):
+    """A planned paid social media campaign (planner only, no automation)."""
+
+    OBJECTIVE_CHOICES = [
+        ("traffic", "Traffic"),
+        ("messages", "Messages"),
+        ("leads", "Leads"),
+    ]
+
+    STATUS_CHOICES = [
+        ("planned", "Planned"),
+        ("running", "Running"),
+        ("completed", "Completed"),
+    ]
+
+    name = models.CharField(max_length=255)
+    objective = models.CharField(max_length=20, choices=OBJECTIVE_CHOICES, default="traffic")
+    daily_budget = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, default="USD")
+    target_location = models.CharField(max_length=200, blank=True, null=True)
+    target_age_min = models.PositiveIntegerField(blank=True, null=True)
+    target_age_max = models.PositiveIntegerField(blank=True, null=True)
+    target_interests = models.TextField(blank=True, null=True, help_text="Comma-separated interests.")
+    estate = models.ForeignKey(
+        Property, on_delete=models.SET_NULL, null=True, blank=True, related_name="ad_campaigns"
+    )
+    ad_copy = models.TextField(blank=True, null=True)
+    image_url = models.URLField(blank=True, null=True)
+    utm_source = models.CharField(max_length=100, blank=True, null=True)
+    utm_medium = models.CharField(max_length=100, blank=True, null=True)
+    utm_campaign = models.CharField(max_length=100, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
+    created_by = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("objective"),
+        FieldPanel("daily_budget"),
+        FieldPanel("currency"),
+        FieldPanel("target_location"),
+        FieldPanel("target_age_min"),
+        FieldPanel("target_age_max"),
+        FieldPanel("target_interests"),
+        FieldPanel("estate"),
+        FieldPanel("ad_copy"),
+        FieldPanel("image_url"),
+        FieldPanel("utm_source"),
+        FieldPanel("utm_medium"),
+        FieldPanel("utm_campaign"),
+        FieldPanel("status"),
+    ]
+
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Ad Campaign"
+        verbose_name_plural = "Ad Campaigns"
+

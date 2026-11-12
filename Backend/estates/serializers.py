@@ -12,6 +12,7 @@ from .models import (
     LeadLeadMatch,
     LeadMatch,
     MarketingPost,
+    AdCampaign,
     Project,
     ProjectUnit,
     ProjectBulkUpload,
@@ -573,4 +574,38 @@ class MarketingPostSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["posted_at", "created_at", "updated_at"]
+
+
+class AdCampaignSerializer(serializers.ModelSerializer):
+    """Serializer for ad campaigns."""
+
+    estate_title = serializers.CharField(source="estate.title", read_only=True, allow_null=True)
+    estate_slug = serializers.CharField(source="estate.slug", read_only=True, allow_null=True)
+
+    class Meta:
+        model = AdCampaign
+        fields = [
+            "id",
+            "name",
+            "objective",
+            "daily_budget",
+            "currency",
+            "target_location",
+            "target_age_min",
+            "target_age_max",
+            "target_interests",
+            "estate",
+            "estate_title",
+            "estate_slug",
+            "ad_copy",
+            "image_url",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "status",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
 

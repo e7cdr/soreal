@@ -10,6 +10,7 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   CircleHelp,
+  DollarSign,
   FilePlus2,
   Heart,
   Home,
@@ -76,6 +77,7 @@ export default function Navigation() {
     { href: "/data-quality", label: "dataQuality", icon: ChartNoAxesCombined },
     { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
     { href: "/marketing/calendar", label: "marketingCalendar", icon: Calendar },
+    { href: "/marketing/ads", label: "adCampaigns", icon: DollarSign },
     {
       href: "/lead-matches",
       label: "leadMatches",
