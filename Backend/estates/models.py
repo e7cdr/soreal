@@ -81,6 +81,41 @@ class Property(ClusterableModel):
         help_text="SEO meta description. Auto-generated from description if left blank.",
     )
 
+    # Source attribution for scraped listings
+    source_site = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Origin site name (e.g., OLX, ZonaProp).",
+    )
+    source_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="Canonical URL of the original listing.",
+    )
+    source_imported_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="When this listing was scraped into SOREAL.",
+    )
+    source_verified = models.BooleanField(
+        default=False,
+        help_text="Has an agent reviewed and confirmed this data?",
+    )
+    source_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text="Content hash to detect cross-site duplicates.",
+    )
+    source_status = models.CharField(
+        max_length=20,
+        default="draft",
+        help_text="draft, verified, or rejected",
+    )
+
     property_type = models.CharField(
         max_length=30, choices=PROPERTY_TYPE_CHOICES, default="house"
     )
@@ -152,6 +187,15 @@ class Property(ClusterableModel):
                 FieldPanel("meta_description"),
             ],
             heading="Basic Info",
+        ),
+        MultiFieldPanel(
+            [
+                FieldPanel("source_site"),
+                FieldPanel("source_url"),
+                FieldPanel("source_verified"),
+                FieldPanel("source_status"),
+            ],
+            heading="Source Attribution",
         ),
         MultiFieldPanel(
             [

@@ -156,7 +156,7 @@ class PropertyViewSet(viewsets.ModelViewSet):
     permission_classes = [IsStaffOrReadOnly]
     lookup_field = "slug"
 
-    filterset_fields = ["property_type", "listing_type", "status", "city", "featured"]
+    filterset_fields = ["property_type", "listing_type", "status", "city", "featured", "source_site"]
     search_fields = ["title", "address", "city", "province", "description"]
     ordering_fields = ["created_at", "price", "title", "bedrooms", "area_sqm"]
     ordering = ["-created_at"]
@@ -190,6 +190,10 @@ class PropertyViewSet(viewsets.ModelViewSet):
 
         if bedrooms:
             queryset = queryset.filter(bedrooms__gte=bedrooms)
+
+        source_site = self.request.query_params.get("source_site", None)
+        if source_site:
+            queryset = queryset.filter(source_site__icontains=source_site)
 
         return queryset
 

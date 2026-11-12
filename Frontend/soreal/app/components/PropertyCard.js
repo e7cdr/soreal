@@ -93,6 +93,15 @@ export default function PropertyCard({ property }) {
           {property.currency} {property.price.toLocaleString()}
         </p>
       )}
+      {property.source_site && property.source_status !== "verified" && (
+        <p className="mt-1 text-xs font-semibold text-[var(--text-muted)]">
+          <span
+            className="rounded-md bg-[var(--surface-muted)] px-2 py-0.5"
+          >
+            {t("fromSource", { site: property.source_site })}
+          </span>
+        </p>
+      )}
       {property.phone && (
         <a
           href={buildWhatsAppUrl(property.phone, t("whatsappContactEstate", { title: property.title })) || "#"}

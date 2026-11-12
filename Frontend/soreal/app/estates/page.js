@@ -32,6 +32,7 @@ export default function EstatesPage() {
     min_price: "",
     max_price: "",
     bedrooms: "",
+    source_site: "",
   });
   const [draftFilters, setDraftFilters] = useState(filters);
   const [savedSearches, setSavedSearches] = useState([]);
@@ -217,6 +218,14 @@ export default function EstatesPage() {
                     onChange={(event) => handleFilterChange("max_price", event.target.value)}
                   />
                 </label>
+                <label className="filter-field">
+                  <span>{t("sourceSite")}</span>
+                  <input
+                    value={draftFilters.source_site}
+                    onChange={(event) => handleFilterChange("source_site", event.target.value)}
+                    placeholder={t("sourceSitePlaceholder")}
+                  />
+                </label>
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -231,6 +240,7 @@ export default function EstatesPage() {
                       min_price: "",
                       max_price: "",
                       bedrooms: "",
+                      source_site: "",
                     };
                     setDraftFilters(cleared);
                     setFilters(cleared);

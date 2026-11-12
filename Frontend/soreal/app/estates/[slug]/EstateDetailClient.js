@@ -362,6 +362,16 @@ export default function EstateDetailClient({ estate }) {
                 {estate.currency} {estate.price.toLocaleString()}
               </p>
             )}
+            {estate.source_url && estate.source_site && (
+              <a
+                href={estate.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:underline"
+              >
+                🔗 {t("viewOriginal")}
+              </a>
+            )}
           </div>
           {(estate.latitude != null && estate.longitude != null || estate.city) && (
             <div className="mt-4">
