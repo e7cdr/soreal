@@ -1,43 +1,24 @@
 # Backend/estates/management/commands/import_whatsapp.py
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 from django.conf import settings
 import os
 
 from estates.whatsapp_parser import (
     unzip_chat_export,
     parse_whatsapp_chat,
+    associate_request_context,
     associate_followup_attachments,
     dedupe_messages,
+    DEFAULT_LEAD_KEYWORDS,
     classify_lead_intent,
     filter_property_leads,
     extract_lead_data,
+    normalize_whatsapp_sender,
 )
 from estates.matching import create_matches_for_lead
 from estates.models import Lead
-
-DEFAULT_LEAD_KEYWORDS = {
-    'for_rent': [
-        'RENT', 'RENTAL', 'FOR RENT', 'ALQUILER', 'APARTAMENTO RENTA', 'CASA RENTA',
-        'LOOKING TO RENT', 'NEED TO RENT', 'WANT TO RENT', 'SE BUSCA RENTA',
-        'APARTMENT FOR RENT', 'HOUSE FOR RENT', 'ROOM FOR RENT',
-    ],
-    'for_sale': [
-        'FOR SALE', 'EN VENTA', 'BUY', 'PURCHASE', 'LOOKING TO BUY', 'WANT TO BUY',
-        'SE BUSCA CASA', 'APARTMENT FOR SALE', 'HOUSE FOR SALE', 'PROPERTY FOR SALE',
-        'LAND FOR SALE', 'VILLA FOR SALE',
-    ],
-    'property_inquiry': [
-        'BEDROOMS', 'BATHROOMS', 'PRICE', 'PRICE RANGE', 'LOCATION', 'AREA', 'SQM',
-        'M2', 'SQUARE METERS', 'NEIGHBORHOOD', 'BARRIO', 'SECTOR', 'CONDOS',
-        'CONDOMINIUM', 'APARTMENT', 'HOUSE', 'VILLA', 'LAND', 'TERRENO',
-        'HOW MUCH', 'CUANTO', 'CUÁNTO', 'DISPONIBLE', 'AVAILABLE',
-    ],
-    'real_estate': [
-        'REAL ESTATE', 'INMOBILIARIA', 'AGENT', 'AGENTE', 'BROKER', 'PROPERTY',
-        'PROPIEDAD', 'LISTING', 'EXCLUSIVE', 'EXCLUSIVA',
-    ],
-}
-
+from estates.models import WhatsAppIgnoredUser
 
 class Command(BaseCommand):
     help = "Import leads from a WhatsApp chat export ZIP file."
@@ -87,7 +68,9 @@ class Command(BaseCommand):
         self.stdout.write(f"Extracted chat export: {txt_path}")
 
         # Step 2: Parse messages
-        all_messages = parse_whatsapp_chat(txt_path, extract_dir, debug=debug)
+        all_messages = associate_request_context(
+            parse_whatsapp_chat(txt_path, extract_dir, debug=debug)
+        )
         self.stdout.write(f"Parsed {len(all_messages)} total messages.")
 
         # Step 3: Classify all messages
@@ -99,7 +82,16 @@ class Command(BaseCommand):
         all_messages = associate_followup_attachments(all_messages, debug=debug)
 
         # Step 5: Filter property leads
-        lead_msgs, misc_msgs = filter_property_leads(all_messages, upper_keywords, recent_days, debug=debug)
+        day_first_dates = os.path.basename(txt_path).lower().startswith(
+            "chat de whatsapp con "
+        )
+        lead_msgs, misc_msgs = filter_property_leads(
+            all_messages,
+            upper_keywords,
+            recent_days,
+            debug=debug,
+            day_first=day_first_dates,
+        )
         self.stdout.write(f"Found {len(lead_msgs)} property leads (last {recent_days} days).")
 
         # Step 6: Deduplicate
@@ -112,15 +104,46 @@ class Command(BaseCommand):
         skipped = 0
         matches_created = 0
         errors = []
+        chat_name = os.path.splitext(os.path.basename(txt_path))[0]
+        for prefix in ("Chat de WhatsApp con ", "WhatsApp Chat with "):
+            if chat_name.startswith(prefix):
+                chat_name = chat_name[len(prefix):]
+                break
+
+        ignored_sender_keys = set(
+            WhatsAppIgnoredUser.objects.values_list("sender_key", flat=True)
+        )
 
         for msg in unique_leads:
+            source_sender = msg.get("sender", "").strip()
+            sender_key = normalize_whatsapp_sender(source_sender)
+            if sender_key and sender_key in ignored_sender_keys:
+                skipped += 1
+                continue
+
             lead_data = extract_lead_data(msg)
 
             # Check for duplicate by phone + name
             phone = lead_data.get('phone', '')
             name = lead_data.get('full_name', '')
 
-            if Lead.objects.filter(phone=phone).exists():
+            request_notes = (
+                f"WhatsApp request:\n{lead_data.get('source_message', '')}"
+            )
+            duplicate_query = Lead.objects.filter(
+                whatsapp_group=chat_name[:200],
+                notes=request_notes,
+            )
+            if source_sender:
+                duplicate_query = duplicate_query.filter(
+                    Q(source_sender=source_sender)
+                    | Q(source_sender="", name=name[:200])
+                )
+            elif phone:
+                duplicate_query = duplicate_query.filter(phone=phone)
+            else:
+                duplicate_query = duplicate_query.filter(name=name[:200], phone="")
+            if duplicate_query.exists():
                 skipped += 1
                 if debug:
                     self.stdout.write(f"Skipped duplicate: {name} ({phone})")
@@ -133,19 +156,25 @@ class Command(BaseCommand):
 
             try:
                 lead = Lead.objects.create(
-                    full_name=lead_data['full_name'],
+                    name=lead_data['full_name'][:200],
                     phone=lead_data['phone'],
-                    whatsapp_group=msg.get('whatsapp_group', ''),
+                    source_sender=source_sender[:200],
+                    whatsapp_group=chat_name[:200],
                     source='whatsapp',
-                    listing_type='any',
+                    listing_type=lead_data.get('listing_type', 'any'),
                     property_type=lead_data.get('property_type', '') or None,
                     min_bedrooms=lead_data.get('min_bedrooms'),
                     max_bedrooms=lead_data.get('max_bedrooms'),
+                    min_bathrooms=lead_data.get('min_bathrooms'),
+                    max_bathrooms=lead_data.get('max_bathrooms'),
                     min_price=lead_data.get('min_price'),
                     max_price=lead_data.get('max_price'),
+                    budget_currency=lead_data.get('budget_currency') or None,
+                    preferred_location=lead_data.get('preferred_location') or None,
+                    furnishing=lead_data.get('furnishing') or None,
                     city=lead_data.get('city', '') or None,
                     province=lead_data.get('province', '') or None,
-                    notes=f"WhatsApp message: {lead_data.get('source_message', '')}",
+                    notes=request_notes,
                     status='new',
                 )
 
@@ -155,7 +184,7 @@ class Command(BaseCommand):
 
                 imported += 1
                 if debug:
-                    self.stdout.write(f"Created lead: {lead.full_name} ({lead.phone}) - {len(new_matches)} match(es)")
+                    self.stdout.write(f"Created lead: {lead.name} ({lead.phone}) - {len(new_matches)} match(es)")
 
             except Exception as e:
                 errors.append(f"Failed to create lead for {name}: {str(e)}")

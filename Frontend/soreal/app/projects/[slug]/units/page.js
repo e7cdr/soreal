@@ -8,6 +8,9 @@ import {
   bulkCreateProjectUnits,
 } from "@/lib/api";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import PageShell from "@/app/components/PageShell";
+import StatStrip from "@/app/components/StatStrip";
+import { X } from "lucide-react";
 
 const STATUS_COLORS = {
   available: "bg-green-100 text-green-700 border-green-200",
@@ -18,7 +21,7 @@ const STATUS_COLORS = {
 };
 
 export default function ProjectUnitsPage({ params }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const [project, setProject] = useState(null);
   const [units, setUnits] = useState([]);
@@ -110,9 +113,26 @@ export default function ProjectUnitsPage({ params }) {
     }
   };
 
-  if (loading) return <div className="p-6">{t("loading")}</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
-  if (!project) return <div className="p-6">Project not found.</div>;
+  if (loading) {
+    return (
+      <PageShell title={t("unitStatus")}>
+        <div className="compact-card text-sm text-[var(--text-muted)]">{t("loading")}</div>
+      </PageShell>
+    );
+  }
+
+  if (!project) {
+    return (
+      <PageShell title={t("unitStatus")}>
+        <div className="compact-card border-red-200 bg-red-50 text-sm text-red-700">
+          {error || t("projectNotFound")}
+        </div>
+        <Link href="/projects" className="toolbar-button mt-3">
+          ← {t("backToProjects")}
+        </Link>
+      </PageShell>
+    );
+  }
 
   const statusCounts = units.reduce(
     (acc, u) => {
@@ -137,232 +157,158 @@ export default function ProjectUnitsPage({ params }) {
     .sort((a, b) => a - b);
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{project.name}</h1>
-          <p className="text-gray-600">{project.description || ""}</p>
-          <p className="text-sm text-gray-500">
-            {project.city}, {project.province}
-          </p>
-        </div>
-        <Link
-          href="/projects"
-          className="text-indigo-600 hover:underline text-sm"
-        >
-          ← {t("backToProjects", {}, {})}
-        </Link>
-      </div>
-
-      {/* Project Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border rounded-lg p-4 text-center">
-          <div className="text-xs text-gray-500">{t("totalUnits")}</div>
-          <div className="text-xl font-bold">{units.length}</div>
-        </div>
-        <div className="bg-white border rounded-lg p-4 text-center">
-          <div className="text-xs text-green-600">{t("availableUnits")}</div>
-          <div className="text-xl font-bold text-green-700">
-            {statusCounts.available || 0}
-          </div>
-        </div>
-        <div className="bg-white border rounded-lg p-4 text-center">
-          <div className="text-xs text-red-600">{t("soldUnits")}</div>
-          <div className="text-xl font-bold text-red-700">
-            {statusCounts.sold || 0}
-          </div>
-        </div>
-        <div className="bg-white border rounded-lg p-4 text-center">
-          <div className="text-xs text-blue-600">{t("reserved", {}, {})}</div>
-          <div className="text-xl font-bold text-blue-700">
-            {statusCounts.reserved || 0}
-          </div>
-        </div>
-      </div>
-
-      {/* Seat Map */}
-      <div className="bg-white border rounded-lg p-6 shadow-sm mb-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold">{t("unitStatus", {}, {})}</h3>
+    <PageShell
+      eyebrow={t("projects")}
+      title={project.name}
+      description={[project.city, project.province, project.description].filter(Boolean).join(" · ")}
+      actions={(
+        <>
           <button
-            onClick={() => setShowBulkForm(!showBulkForm)}
-            className="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+            type="button"
+            onClick={() => {
+              setError(null);
+              setShowBulkForm(true);
+            }}
+            className="toolbar-button toolbar-button-primary"
           >
             {t("bulkCreateUnits")}
           </button>
+          <Link href="/projects" className="toolbar-button">
+            ← {t("backToProjects")}
+          </Link>
+        </>
+      )}
+    >
+      {error && !showBulkForm && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
+          {error}
         </div>
+      )}
 
-        {floors.map((floor) => (
-          <div key={floor} className="mb-6">
-            <h4 className="text-sm font-bold text-gray-600 mb-3">
-              Floor {floor}
-            </h4>
-            <div className="flex flex-wrap justify-center gap-2">
-              {unitsByFloor[floor].map((unit) => (
-                <div
-                  key={unit.id}
-                  className={`w-16 h-16 rounded flex flex-col items-center justify-center text-xs font-bold cursor-pointer border ${STATUS_COLORS[unit.status] || "bg-gray-100 text-gray-700"}`}
-                  title={`${unit.unit_number} - ${t(unit.status, {}, {}) || unit.status}`}
-                >
-                  <span>{unit.unit_number}</span>
-                  <span className="mt-0.5 text-[10px] opacity-75">
-                    {unit.bedrooms}BR
-                  </span>
-                </div>
-              ))}
+      <StatStrip
+        items={[
+          { label: t("totalUnits"), value: units.length },
+          { label: t("availableUnits"), value: statusCounts.available || 0 },
+          { label: t("soldUnits"), value: statusCounts.sold || 0 },
+          { label: t("reserved"), value: statusCounts.reserved || 0 },
+        ]}
+      />
+
+      <div className="compact-card mt-3">
+        <h2 className="mb-3 text-sm font-semibold">{t("unitStatus")}</h2>
+        {floors.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--text-muted)]">{t("noUnits")}</p>
+        ) : (
+          floors.map((floor) => (
+            <div key={floor} className="mb-4 last:mb-0">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                {t("floor")} {floor}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {unitsByFloor[floor].map((unit) => (
+                  <div
+                    key={unit.id}
+                    className={`flex h-14 w-14 cursor-pointer flex-col items-center justify-center rounded border text-xs font-bold ${STATUS_COLORS[unit.status] || "bg-gray-100 text-gray-700"}`}
+                    title={`${unit.unit_number} - ${t(unit.status) || unit.status}`}
+                  >
+                    <span>{unit.unit_number}</span>
+                    <span className="mt-0.5 text-[10px] opacity-75">
+                      {unit.bedrooms}BR
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {/* Bulk Create Form */}
       {showBulkForm && (
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-bold mb-4">{t("bulkCreateUnits")}</h3>
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          <form onSubmit={handleBulkSubmit} className="space-y-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("unitType")}
-              </label>
-              <select
-                name="unit_type"
-                value={bulkForm.unit_type}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+          <form onSubmit={handleBulkSubmit} className="my-4 grid w-full max-w-3xl gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl md:grid-cols-3">
+            <div className="flex items-center justify-between gap-3 md:col-span-3">
+              <h2 className="text-lg font-bold">{t("bulkCreateUnits")}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkForm(false);
+                  setError(null);
+                }}
+                className="toolbar-button"
               >
+                <X size={16} />
+                {t("close")}
+              </button>
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 md:col-span-3">
+                {error}
+              </div>
+            )}
+
+            <label className="filter-field">
+              <span>{t("unitType")}</span>
+              <select name="unit_type" value={bulkForm.unit_type} onChange={handleBulkChange}>
                 <option value="Studio">Studio</option>
                 <option value="1BR">1BR</option>
                 <option value="2BR">2BR</option>
                 <option value="3BR">3BR</option>
                 <option value="Penthouse">Penthouse</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("bedrooms")}
-              </label>
-              <input
-                type="number"
-                name="bedrooms"
-                value={bulkForm.bedrooms}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("bathrooms")}
-              </label>
-              <input
-                type="number"
-                name="bathrooms"
-                value={bulkForm.bathrooms}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("areaSqm")}
-              </label>
-              <input
-                type="number"
-                name="area_sqm"
-                value={bulkForm.area_sqm}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t("price")}</label>
-              <input
-                type="number"
-                name="price"
-                value={bulkForm.price}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Currency</label>
-              <select
-                name="currency"
-                value={bulkForm.currency}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
+            </label>
+            <label className="filter-field">
+              <span>{t("bedrooms")}</span>
+              <input type="number" name="bedrooms" value={bulkForm.bedrooms} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("bathrooms")}</span>
+              <input type="number" name="bathrooms" value={bulkForm.bathrooms} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("areaSqm")}</span>
+              <input type="number" name="area_sqm" value={bulkForm.area_sqm} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("price")}</span>
+              <input type="number" name="price" value={bulkForm.price} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("currency")}</span>
+              <select name="currency" value={bulkForm.currency} onChange={handleBulkChange}>
                 <option value="DOP">DOP</option>
                 <option value="USD">USD</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t("status")}</label>
-              <select
-                name="status"
-                value={bulkForm.status}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              >
+            </label>
+            <label className="filter-field">
+              <span>{t("status")}</span>
+              <select name="status" value={bulkForm.status} onChange={handleBulkChange}>
                 <option value="available">{t("available")}</option>
-                <option value="reserved">{t("reserved", {}, {})}</option>
+                <option value="reserved">{t("reserved")}</option>
                 <option value="sold">{t("sold")}</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t("floor")}</label>
-              <input
-                type="number"
-                name="floor"
-                value={bulkForm.floor}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t("orientation")}</label>
-              <input
-                type="text"
-                name="orientation"
-                value={bulkForm.orientation}
-                onChange={handleBulkChange}
-                placeholder="North, South, etc."
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Number of Units
-              </label>
-              <input
-                type="number"
-                name="count"
-                value={bulkForm.count}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Start Unit Number
-              </label>
-              <input
-                type="number"
-                name="start_number"
-                value={bulkForm.start_number}
-                onChange={handleBulkChange}
-                className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
-            </div>
-            <div className="md:col-span-3">
+            </label>
+            <label className="filter-field">
+              <span>{t("floor")}</span>
+              <input type="number" name="floor" value={bulkForm.floor} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("orientation")}</span>
+              <input type="text" name="orientation" value={bulkForm.orientation} onChange={handleBulkChange} placeholder={t("orientationExample")} />
+            </label>
+            <label className="filter-field">
+              <span>{t("numberOfUnits")}</span>
+              <input type="number" name="count" value={bulkForm.count} onChange={handleBulkChange} />
+            </label>
+            <label className="filter-field">
+              <span>{t("startUnitNumber")}</span>
+              <input type="number" name="start_number" value={bulkForm.start_number} onChange={handleBulkChange} />
+            </label>
+            <div className="flex items-end md:col-span-1">
               <button
                 type="submit"
                 disabled={bulkSubmitting}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-300 font-medium"
+                className="toolbar-button toolbar-button-primary w-full disabled:opacity-50"
               >
                 {bulkSubmitting ? t("saving") : t("bulkCreateUnits")}
               </button>
@@ -370,6 +316,6 @@ export default function ProjectUnitsPage({ params }) {
           </form>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

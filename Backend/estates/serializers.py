@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
 from .models import (
+    Broker,
+    Owner,
     Property,
     PropertyImage,
     PropertyInquiry,
@@ -11,6 +13,7 @@ from .models import (
     Project,
     ProjectUnit,
     ProjectBulkUpload,
+    ScanInboxItem,
 )
 
 
@@ -56,11 +59,14 @@ class PropertySerializer(serializers.ModelSerializer):
             "status",
             "featured",
             "amenities",
+            "broker",
+            "owner",
+            "source_lead",
             "images",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["slug", "created_at", "updated_at"]
+        read_only_fields = ["slug", "source_lead", "created_at", "updated_at"]
 
 
 class PropertyInquirySerializer(serializers.ModelSerializer):
@@ -165,28 +171,145 @@ class SavedSearchSerializer(serializers.ModelSerializer):
 class LeadSerializer(serializers.ModelSerializer):
     """Serializer for leads from WhatsApp groups or manual entry."""
 
+    broker_name = serializers.CharField(source="broker.name", read_only=True, allow_null=True)
+    broker_company = serializers.CharField(source="broker.company", read_only=True, allow_null=True)
+    estate_id = serializers.SerializerMethodField()
+    estate_slug = serializers.SerializerMethodField()
+
     class Meta:
         model = Lead
         fields = [
             "id",
             "name",
             "phone",
+            "source_sender",
+            "broker",
+            "broker_name",
+            "broker_company",
+            "estate_id",
+            "estate_slug",
             "whatsapp_group",
             "source",
             "listing_type",
             "property_type",
             "min_bedrooms",
             "max_bedrooms",
+            "min_bathrooms",
+            "max_bathrooms",
             "min_price",
             "max_price",
+            "budget_currency",
+            "preferred_location",
+            "furnishing",
             "city",
             "province",
             "notes",
+            "attachments",
             "status",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["source_sender", "attachments", "created_at", "updated_at"]
+
+    def get_estate_id(self, obj):
+        return obj.created_property.id if hasattr(obj, "created_property") else None
+
+    def get_estate_slug(self, obj):
+        return obj.created_property.slug if hasattr(obj, "created_property") else None
+
+
+class BrokerSerializer(serializers.ModelSerializer):
+    request_count = serializers.IntegerField(read_only=True)
+    property_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Broker
+        fields = [
+            "id",
+            "name",
+            "phone",
+            "email",
+            "company",
+            "notes",
+            "request_count",
+            "property_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["request_count", "property_count", "created_at", "updated_at"]
+
+
+class OwnerSerializer(serializers.ModelSerializer):
+    property_count = serializers.IntegerField(read_only=True)
+    project_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Owner
+        fields = [
+            "id",
+            "name",
+            "phone",
+            "email",
+            "company",
+            "identification",
+            "notes",
+            "property_count",
+            "project_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["property_count", "project_count", "created_at", "updated_at"]
+
+
+class ScanInboxItemSerializer(serializers.ModelSerializer):
+    lead_id = serializers.IntegerField(read_only=True)
+    broker_id = serializers.IntegerField(read_only=True)
+    property_id = serializers.IntegerField(read_only=True)
+    property_slug = serializers.CharField(source="property.slug", read_only=True, allow_null=True)
+    suggested_request = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ScanInboxItem
+        fields = [
+            "id",
+            "fingerprint",
+            "whatsapp_group",
+            "sender",
+            "message_date",
+            "message_time",
+            "message",
+            "attachments",
+            "status",
+            "lead_id",
+            "broker_id",
+            "property_id",
+            "property_slug",
+            "suggested_request",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_suggested_request(self, obj):
+        from .whatsapp_parser import extract_lead_data
+        from .whatsapp_parser.extractor import extract_phone_number
+
+        extracted = extract_lead_data({"sender": obj.sender, "message": obj.message})
+        return {
+            "name": extracted.get("full_name") or obj.sender,
+            "phone": extract_phone_number(obj.sender),
+            "listing_type": extracted.get("listing_type") or "any",
+            "property_type": extracted.get("property_type") or "",
+            "min_bedrooms": extracted.get("min_bedrooms"),
+            "max_bedrooms": extracted.get("max_bedrooms"),
+            "min_bathrooms": extracted.get("min_bathrooms"),
+            "max_bathrooms": extracted.get("max_bathrooms"),
+            "min_price": extracted.get("min_price"),
+            "max_price": extracted.get("max_price"),
+            "budget_currency": extracted.get("budget_currency") or "",
+            "preferred_location": extracted.get("preferred_location") or "",
+            "furnishing": extracted.get("furnishing") or "",
+        }
 
 
 class LeadMatchSerializer(serializers.ModelSerializer):
@@ -256,10 +379,9 @@ class ProjectUnitSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     """Serializer for real estate development projects."""
 
-    units = ProjectUnitSerializer(many=True, read_only=True)
-    unit_count = serializers.SerializerMethodField()
-    available_count = serializers.SerializerMethodField()
-    sold_count = serializers.SerializerMethodField()
+    unit_count = serializers.IntegerField(read_only=True, default=0)
+    available_count = serializers.IntegerField(read_only=True, default=0)
+    sold_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Project
@@ -269,13 +391,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "developer",
+            "broker",
+            "owner",
             "address",
             "city",
             "province",
             "status",
             "total_units",
             "available_units",
-            "units",
             "unit_count",
             "available_count",
             "sold_count",
@@ -284,15 +407,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["slug", "created_at", "updated_at"]
-
-    def get_unit_count(self, obj):
-        return obj.units.count()
-
-    def get_available_count(self, obj):
-        return obj.units.filter(status="available").count()
-
-    def get_sold_count(self, obj):
-        return obj.units.filter(status__in=["sold", "rented"]).count()
 
 
 class ProjectBulkUploadSerializer(serializers.ModelSerializer):

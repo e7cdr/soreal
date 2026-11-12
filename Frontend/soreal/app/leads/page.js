@@ -7,13 +7,14 @@ import {
   createLead,
 } from "@/lib/api";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import PageShell from "@/app/components/PageShell";
 
 export default function LeadsPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -89,8 +90,13 @@ export default function LeadsPage() {
     }
   };
 
-  if (loading) return <div className="p-6">{t("loading")}</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (loading) {
+    return (
+      <PageShell title={t("addLead")}>
+        <div className="compact-card text-sm text-[var(--text-muted)]">{t("loading")}</div>
+      </PageShell>
+    );
+  }
 
   const statusBadge = (status) => {
     const colors = {
@@ -107,26 +113,38 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t("leads", {}, {})}</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-        >
-          {showForm ? t("hideForm", {}, {}) : t("addLead", {}, {})}
-        </button>
-      </div>
+    <PageShell
+      title={t("addLead")}
+      description={t("addLeadDescription")}
+      actions={(
+        <>
+          <button
+            type="button"
+            onClick={() => setShowForm(!showForm)}
+            className="toolbar-button toolbar-button-primary"
+          >
+            {showForm ? t("hideForm") : t("addLead")}
+          </button>
+          <Link href="/requests" className="toolbar-button">
+            ← {t("backToRequests")}
+          </Link>
+        </>
+      )}
+    >
+      {error && !showForm && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {showForm && (
-        <div className="bg-gray-50 p-6 rounded-lg mb-6">
-          <h2 className="text-lg font-bold mb-4">{t("addLead")}</h2>
+        <div className="compact-card mb-3">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
               {error}
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">{t("fullName")}</label>
               <input
@@ -278,7 +296,7 @@ export default function LeadsPage() {
                 disabled={submitting}
                 className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
               >
-                {submitting ? t("saving") : t("createLeadBtn", {}, {})}
+                {submitting ? t("saving") : t("createLeadBtn")}
               </button>
             </div>
           </form>
@@ -286,35 +304,78 @@ export default function LeadsPage() {
       )}
 
       {leads.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No leads yet. Add your first lead from a WhatsApp group.
+        <div className="compact-card py-10 text-center text-sm text-[var(--text-muted)]">
+          {t("noLeads")}
         </div>
       )}
 
       {leads.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="p-3">{t("name")}</th>
-                <th className="p-3">{t("phone")}</th>
-                <th className="p-3">Group</th>
-                <th className="p-3">Looking For</th>
-                <th className="p-3">{t("status")}</th>
-                <th className="p-3">{t("submitted")}</th>
+        <div className="table-scroll">
+          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            <thead className="bg-[var(--surface-muted)] text-xs uppercase text-[var(--text-muted)]">
+              <tr>
+                <th className="px-3 py-2">{t("name")}</th>
+                <th className="px-3 py-2">{t("phone")}</th>
+                <th className="px-3 py-2">Group</th>
+                <th className="px-3 py-2">Looking For</th>
+                <th className="px-3 py-2">{t("status")}</th>
+                <th className="px-3 py-2">{t("media")}</th>
+                <th className="px-3 py-2">{t("submitted")}</th>
               </tr>
             </thead>
             <tbody>
               {leads.map((lead) => (
-                <tr key={lead.id} className="border-b">
-                  <td className="p-3">{lead.name}</td>
-                  <td className="p-3">{lead.phone}</td>
-                  <td className="p-3 text-sm">{lead.whatsapp_group || "—"}</td>
-                  <td className="p-3 text-sm">
-                    {lead.listing_type} · {lead.property_type || "any"} · {lead.city || "—"}
+                <tr key={lead.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2">
+                    <Link
+                      href={`/requests/${lead.id}`}
+                      className="font-medium text-[var(--green)] hover:underline"
+                    >
+                      {lead.name}
+                    </Link>
                   </td>
-                  <td className="p-3">{statusBadge(lead.status)}</td>
-                  <td className="p-3 text-xs text-gray-500">
+                  <td className="px-3 py-2">{lead.phone}</td>
+                  <td className="px-3 py-2 text-xs">{lead.whatsapp_group || "—"}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {lead.listing_type} · {lead.property_type || "any"}
+                    {lead.min_bedrooms != null && ` · ${lead.min_bedrooms} bd`}
+                    {lead.min_bathrooms != null && ` · ${lead.min_bathrooms} ba`}
+                    {(lead.min_price != null || lead.max_price != null) &&
+                      ` · ${
+                        lead.min_price === lead.max_price
+                          ? lead.min_price
+                          : `${lead.min_price ?? "0"}-${lead.max_price ?? "∞"}`
+                      } ${lead.budget_currency || ""}`}
+                    {(lead.preferred_location || lead.city) &&
+                      ` · ${lead.preferred_location || lead.city}`}
+                    {lead.furnishing && ` · ${lead.furnishing}`}
+                    {lead.notes && (
+                      <details className="mt-1 max-w-md">
+                        <summary className="cursor-pointer text-[var(--green)]">
+                          Original request
+                        </summary>
+                        <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--text-muted)]">
+                          {lead.notes.replace(/^WhatsApp request:\s*/, "")}
+                        </p>
+                      </details>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">{statusBadge(lead.status)}</td>
+                  <td className="px-3 py-2">
+                    {lead.attachments?.map((attachment) => (
+                      <a
+                        key={attachment.url}
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mr-2 text-[var(--green)] hover:underline"
+                      >
+                        {attachment.name}
+                      </a>
+                    ))}
+                    {!lead.attachments?.length && "—"}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-[var(--text-muted)]">
                     {new Date(lead.created_at).toLocaleDateString()}
                   </td>
                 </tr>
@@ -323,6 +384,6 @@ export default function LeadsPage() {
           </table>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

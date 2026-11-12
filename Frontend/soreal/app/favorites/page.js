@@ -6,16 +6,13 @@ import { fetchEstate } from "@/lib/api";
 import { getFavorites } from "@/lib/favorites";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import EmptyState from "@/app/components/EmptyState";
+import PageShell from "@/app/components/PageShell";
 
 export default function FavoritesPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    loadFavorites();
-  }, []);
 
   async function loadFavorites() {
     const favIds = getFavorites();
@@ -49,6 +46,11 @@ export default function FavoritesPage() {
     setLoading(false);
   }
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadFavorites();
+  }, []);
+
   const handleRemoveFavorite = (id) => {
     import("@/lib/favorites").then(({ removeFavorite }) => {
       removeFavorite(id);
@@ -56,62 +58,64 @@ export default function FavoritesPage() {
     });
   };
 
-  if (loading) return <div className="p-6">{t("loading")}</div>;
+  if (loading) {
+    return (
+      <PageShell title={t("favorites")}>
+        <div className="compact-card text-sm text-[var(--text-muted)]">{t("loading")}</div>
+      </PageShell>
+    );
+  }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t("favorites", {}, {})}</h1>
-        <Link
-          href="/estates"
-          className="text-blue-600 hover:underline text-sm"
-        >
-          ← {t("backToEstates", {}, {})}
+    <PageShell
+      title={t("favorites")}
+      actions={(
+        <Link href="/estates" className="toolbar-button">
+          ← {t("backToEstates")}
         </Link>
-      </div>
-
-      {favorites.length === 0 && (
-        <EmptyState
-          title={t("noFavorites", {}, {})}
-          message={t("noFavoritesMessage", {}, {})}
-        />
       )}
-
-      {favorites.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    >
+      {favorites.length === 0 ? (
+        <EmptyState
+          title={t("noFavorites")}
+          message={t("noFavoritesMessage")}
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {favorites.map((prop) => (
-            <article
-              key={prop.id}
-              className="border rounded-lg p-4 hover:shadow-md transition relative"
-            >
+            <article key={prop.id} className="compact-card relative transition hover:shadow-md">
               <button
+                type="button"
+                aria-label={t("removeFavorite")}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   handleRemoveFavorite(prop.id);
                 }}
-                className="absolute top-2 right-2 p-2 bg-white/90 rounded-full hover:bg-white transition"
+                className="absolute right-2 top-2 z-10 rounded-full bg-white/90 p-1.5 text-red-500 hover:bg-white"
               >
-                <span className="text-red-500">✕</span>
+                ✕
               </button>
               {prop.images?.[0]?.image_url && (
                 <img
                   src={prop.images[0].image_url}
                   alt={prop.title}
-                  className="w-full h-48 object-cover rounded mb-2"
+                  className="mb-2 h-36 w-full rounded object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               )}
               <Link href={`/estates/${prop.slug}`} className="block">
-                <h3 className="font-bold text-lg">{prop.title}</h3>
+                <h3 className="text-base font-bold">{prop.title}</h3>
               </Link>
-              <p className="text-gray-600 text-sm">
+              <p className="text-xs text-[var(--text-muted)]">
                 {prop.city}, {prop.province}
               </p>
-              <p className="text-gray-600 text-sm capitalize">
+              <p className="text-xs capitalize text-[var(--text-muted)]">
                 {prop.property_type} · {prop.listing_type}
               </p>
               {prop.price && (
-                <p className="font-bold mt-1">
+                <p className="mt-1 text-sm font-bold">
                   {prop.currency} {prop.price.toLocaleString()}
                 </p>
               )}
@@ -119,6 +123,6 @@ export default function FavoritesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -3,15 +3,18 @@
 import "./globals.css";
 import Navigation from "./components/Navigation";
 import { LanguageProvider } from "./components/LanguageProvider";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <LanguageProvider>
-          <Navigation />
-          <main>{children}</main>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <Navigation />
+            <main>{children}</main>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

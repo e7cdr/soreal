@@ -2,7 +2,14 @@ from django.db.models import Avg, Count, Max, Min, Sum, Q, F
 from django.db.models.functions import TruncMonth, TruncWeek, TruncDay
 from django.utils import timezone
 from datetime import timedelta
-from .models import Property, PropertyInquiry, Lead, TenantApplication, ProjectUnit
+from .models import (
+    Property,
+    PropertyInquiry,
+    Lead,
+    TenantApplication,
+    Project,
+    ProjectUnit,
+)
 
 
 def get_date_range(period="6m"):

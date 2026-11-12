@@ -100,10 +100,13 @@ class BlacklistAPITest(TestCase):
         self.assertEqual(data["count"], 1)
 
     def test_stats_endpoint(self):
-        resp = self.client.get("/api/blacklist/persons/stats/")
+        self.client.defaults = {}
+        with self.assertNumQueries(1):
+            resp = self.client.get("/api/blacklist/persons/stats/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["total"], 1)
+        self.assertEqual(data["by_status"]["verified"], 1)
 
 
 class EstatesAPITest(TestCase):
@@ -131,6 +134,53 @@ class EstatesAPITest(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["title"], "Test House")
+
+
+class ProjectListAPITest(TestCase):
+    def setUp(self):
+        from estates.models import Project, ProjectUnit
+
+        self.user = User.objects.create_superuser(
+            "projects-admin", "projects@test.com", "pass"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Token {self.token.key}"
+        self.project = Project.objects.create(name="Project API Test")
+        ProjectUnit.objects.create(
+            project=self.project, unit_number="101", status="available"
+        )
+        ProjectUnit.objects.create(
+            project=self.project, unit_number="102", status="sold"
+        )
+
+    def test_project_list_returns_counts_without_unit_details(self):
+        response = self.client.get("/api/estates/projects/")
+        self.assertEqual(response.status_code, 200)
+        project = response.json()["results"][0]
+        self.assertNotIn("units", project)
+        self.assertEqual(project["unit_count"], 2)
+        self.assertEqual(project["available_count"], 1)
+        self.assertEqual(project["sold_count"], 1)
+
+    def test_project_unit_list_accepts_project_slug(self):
+        response = self.client.get(
+            f"/api/estates/project-units/?project={self.project.slug}"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 2)
+
+    def test_bulk_create_accepts_project_slug(self):
+        response = self.client.post(
+            "/api/estates/project-units/bulk_create/",
+            {
+                "project": self.project.slug,
+                "units": [{"unit_number": "103"}],
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.json()["created_units"]), 1)
+        self.assertEqual(response.json()["errors"], [])
 
 
 class InquiryScreeningTest(TestCase):
@@ -452,4 +502,3 @@ class ReportSubmissionAPITest(TestCase):
         self.assertEqual(resp.status_code, 400)
         submission.refresh_from_db()
         self.assertEqual(submission.status, "pending")
-

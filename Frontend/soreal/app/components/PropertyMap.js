@@ -17,12 +17,13 @@ const defaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = defaultIcon;
 
-export default function PropertyMap({ properties, center = [18.4861, -69.9312], zoom = 10 }) {
-  const { t } = useTranslation();
+export default function PropertyMap({ properties, center = [18.4861, -69.9312], zoom = 10, height = 320 }) {
+  const { translate: t } = useTranslation();
   const [map, setMap] = useState(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -41,11 +42,16 @@ export default function PropertyMap({ properties, center = [18.4861, -69.9312], 
   }, [map, mounted, properties]);
 
   if (!mounted) {
-    return <div className="w-full h-[400px] bg-gray-200 rounded-lg animate-pulse" />;
+    return (
+      <div
+        className="w-full animate-pulse rounded-lg bg-gray-200"
+        style={{ height }}
+      />
+    );
   }
 
   return (
-    <div className="w-full h-[400px] rounded-lg border">
+    <div className="w-full rounded-lg border" style={{ height }}>
       <MapContainer
         center={center}
         zoom={zoom}

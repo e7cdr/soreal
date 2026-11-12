@@ -7,19 +7,21 @@ import {
   removeFavorite,
 } from "@/lib/favorites";
 import { Heart } from "lucide-react";
+import StaleBadge from "@/app/components/StaleBadge";
 
 export default function PropertyCard({ property }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [isFav, setIsFav] = useState(false);
   const coverImage =
     property.images?.find((img) => img.is_cover)?.image_url ||
     property.images?.[0]?.image_url ||
     null;
 
-  const typeLabel = t(property.property_type, {}, {});
-  const listingLabel = t(property.listing_type, {}, {});
+  const typeLabel = t(property.property_type);
+  const listingLabel = t(property.listing_type);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsFav(isFavorite(property.id));
   }, [property.id]);
 
@@ -56,9 +58,12 @@ export default function PropertyCard({ property }) {
           className="w-full h-48 object-cover rounded mb-2"
         />
       )}
-      <Link href={`/estates/${property.slug}`} className="block">
-        <h3 className="font-bold text-lg">{property.title}</h3>
-      </Link>
+      <div className="flex items-baseline gap-2 mb-1">
+        <Link href={`/estates/${property.slug}`} className="block">
+          <h3 className="font-bold text-lg">{property.title}</h3>
+        </Link>
+        <StaleBadge createdAt={property.created_at} />
+      </div>
       <p className="text-gray-600 text-sm">
         {property.city} · {typeLabel} · {listingLabel}
       </p>

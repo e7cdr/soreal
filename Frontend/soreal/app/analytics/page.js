@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import {
   fetchAnalyticsSummary,
   fetchAnalyticsPriceTrends,
@@ -11,33 +10,14 @@ import {
   fetchAnalyticsLocationStats,
   fetchAnalyticsUnitStatus,
 } from "@/lib/api";
+import Link from "next/link";
+import { Users, Plus } from "lucide-react";
 import { useTranslation } from "@/app/components/LanguageProvider";
-
-function StatCard({ title, value, subtitle, trend }) {
-  const { t } = useTranslation();
-  return (
-    <div className="bg-white border rounded-lg p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500">{title}</p>
-          <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
-          {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
-        </div>
-        {trend !== undefined && (
-          <div className="text-right">
-            <p className={`text-sm font-bold ${trend >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {trend >= 0 ? "+" : ""}{trend}%
-            </p>
-            <p className="text-xs text-gray-400">vs last period</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import PageShell from "@/app/components/PageShell";
+import StatStrip from "@/app/components/StatStrip";
 
 function SparklineChart({ data, height = 80, label }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   if (!data || data.length === 0) return null;
 
   const values = data.map((d) => d.value);
@@ -81,30 +61,30 @@ function SparklineChart({ data, height = 80, label }) {
   );
 }
 
-function BarChart({ data, label, valueKey = "count", height = 200 }) {
-  const { t } = useTranslation();
+function BarChart({ data, label, valueKey = "count", height = 140 }) {
+  const { translate: t } = useTranslation();
   if (!data || data.length === 0) return null;
 
-  const max = Math.max(...data.map((d) => d[valueKey])) || 1;
+  const max = Math.max(...data.map((d) => d[valueKey] ?? d.value ?? 0)) || 1;
 
   return (
-    <div className="mt-4">
-      <p className="text-xs text-gray-500 mb-2">{label}</p>
-      <div className="flex items-end justify-between gap-2 h-[180px]">
+    <div>
+      <p className="mb-2 text-xs text-gray-500">{label}</p>
+      <div className="flex items-end justify-between gap-2" style={{ height }}>
         {data.map((item) => {
-          const pct = ((item[valueKey] / max) * 100).toFixed(0);
+          const value = item[valueKey] ?? item.value ?? 0;
           const label =
-            item.city || item.property_type || item.date || item.stage || "";
+            item.label || item.city || item.property_type || item.date || item.stage || "";
           return (
-            <div key={label} className="flex flex-col items-center">
+            <div key={`${label}-${value}`} className="flex flex-col items-center">
               <div
                 className="bg-indigo-600 rounded-t"
-                style={{ height: `${pct}%`, width: "32px" }}
+                style={{ height: `${Math.max(3, (value / max) * 100)}%`, width: "32px" }}
               />
               <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
                 {label.length > 12 ? label.slice(0, 12) + "…" : label}
               </span>
-              <span className="text-xs font-bold">{item[valueKey]}</span>
+              <span className="text-xs font-bold">{value}</span>
             </div>
           );
         })}
@@ -114,7 +94,7 @@ function BarChart({ data, label, valueKey = "count", height = 200 }) {
 }
 
 export default function AnalyticsPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [summary, setSummary] = useState(null);
   const [priceTrends, setPriceTrends] = useState([]);
   const [requestVolume, setRequestVolume] = useState([]);
@@ -123,14 +103,12 @@ export default function AnalyticsPage() {
   const [locationStats, setLocationStats] = useState([]);
   const [unitStatus, setUnitStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [period, setPeriod] = useState("6m");
-
-  useEffect(() => {
-    loadData();
-  }, [period]);
 
   async function loadData() {
     setLoading(true);
+    setError("");
     try {
       const [summaryRes, trendsRes, volumeRes, funnelRes, categoryRes, locationRes, unitRes] =
         await Promise.all([
@@ -150,13 +128,16 @@ export default function AnalyticsPage() {
       setLocationStats(locationRes);
       setUnitStatus(unitRes);
     } catch (err) {
-      console.error(err);
+      setError(err.message || t("error"));
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) return <div className="p-6">{t("loading")}</div>;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [period]);
 
   const avgPrice =
     priceTrends.length > 0
@@ -164,145 +145,145 @@ export default function AnalyticsPage() {
       : 0;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t("analytics")}</h1>
-        <div className="flex gap-2">
+    <PageShell
+      title={t("analytics")}
+      actions={(
+        <div className="toolbar-segmented" aria-label={t("analytics")}>
           {["1m", "3m", "6m", "1y"].map((p) => (
             <button
               key={p}
+              type="button"
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1 rounded text-sm ${
-                period === p
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`toolbar-tab ${period === p ? "toolbar-tab-active" : ""}`}
             >
               {t(`last${p === "1m" ? "Month" : p === "3m" ? "3Months" : p === "6m" ? "6Months" : "Year"}`)}
             </button>
           ))}
         </div>
-      </div>
+      )}
+    >
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          title={t("totalProperties")}
-          value={summary?.total_properties || 0}
-          subtitle={t("availableUnits")}
-        />
-        <StatCard
-          title={t("totalInquiries")}
-          value={summary?.total_inquiries || 0}
-          trend={5}
-        />
-        <StatCard
-          title={t("totalLeads")}
-          value={summary?.total_leads || 0}
-          trend={12}
-        />
-        <StatCard
-          title={t("totalApplications")}
-          value={summary?.total_applications || 0}
-          trend={-3}
-        />
-      </div>
+      {loading ? (
+        <div className="compact-card text-center text-sm text-[var(--text-muted)]">
+          {t("loading")}
+        </div>
+      ) : summary?.total_properties === 0 && summary?.total_leads === 0 ? (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center space-y-3">
+          <Users className="mx-auto mb-3 text-[var(--text-muted)]" size={36} />
+          <h2 className="font-semibold">{t("analyticsEmptyTitle")}</h2>
+          <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">{t("analyticsEmptyDescription")}</p>
+          <Link href="/estates" className="inline-flex items-center gap-2 rounded-lg bg-[var(--green)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+            <Plus size={16} />
+            {t("uploadEstates")}
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <StatStrip
+            items={[
+              {
+                label: t("totalProperties"),
+                value: summary?.total_properties || 0,
+                sub: t("availableUnits"),
+              },
+              { label: t("totalInquiries"), value: summary?.total_inquiries || 0, sub: "+5% vs last period" },
+              { label: t("totalLeads"), value: summary?.total_leads || 0, sub: "+12% vs last period" },
+              { label: t("totalApplications"), value: summary?.total_applications || 0, sub: "-3% vs last period" },
+            ]}
+          />
 
-      {/* Price Trends + Request Volume */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("priceTrends")}</h3>
-          <div className="text-right text-2xl font-bold text-gray-900 mb-4">
-            ${avgPrice.toLocaleString()}
-          </div>
-          <SparklineChart
-            data={priceTrends.map((d, i) => ({ value: d.avg_price, label: d.date }))}
-            label={t("avgPriceTrend", {}, {})}
-          />
-        </div>
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("requestVolume")}</h3>
-          <BarChart
-            data={requestVolume.map((d, i) => ({ value: d.inquiries + d.leads, label: d.date }))}
-            label={t("inquiriesAndLeads", {}, {})}
-          />
-        </div>
-      </div>
-
-      {/* Conversion Funnel + Category Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("conversionFunnel")}</h3>
-          <div className="space-y-3">
-            {conversionFunnel.map((stage, i) => {
-              const pct = stage.conversion_rate;
-              return (
-                <div key={stage.stage}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>{stage.stage}</span>
-                    <span>{stage.count}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-indigo-600 rounded-full h-2"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500">
-                    {pct.toFixed(1)}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("categoryStats")}</h3>
-          <BarChart
-            data={categoryStats.map((d) => ({ value: d.count, label: d.property_type }))}
-            label={t("propertiesByType", {}, {})}
-          />
-        </div>
-      </div>
-
-      {/* Location Stats + Unit Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("locationStats")}</h3>
-          <BarChart
-            data={locationStats.map((d) => ({ value: d.count, label: d.city }))}
-            label={t("propertiesByLocation", {}, {})}
-          />
-        </div>
-        <div className="bg-white border rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold mb-4">{t("unitStatus")}</h3>
-          <div className="space-y-3">
-            {unitStatus?.by_status.map((s) => (
-              <div key={s.status}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>{t(s.status, {}, {}) || s.status}</span>
-                  <span>{s.count}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-indigo-600 rounded-full h-2"
-                    style={{ width: `${s.percentage}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">
-                  {s.percentage.toFixed(1)}%
-                </span>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("priceTrends")}</h3>
+              <div className="mb-2 text-right text-lg font-bold text-[var(--foreground)]">
+                ${avgPrice.toLocaleString()}
               </div>
-            ))}
-            <div className="mt-3 pt-3 border-t">
-              <div className="flex justify-between text-sm font-bold">
-                <span>{t("totalUnits", {}, {})}</span>
-                <span>{unitStatus?.total_units || 0}</span>
+              <SparklineChart
+                data={priceTrends.map((d, i) => ({ value: d.avg_price, label: d.date }))}
+                label={t("avgPriceTrend")}
+                height={92}
+              />
+            </div>
+
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("requestVolume")}</h3>
+              <BarChart
+                data={requestVolume.map((d, i) => ({ value: d.inquiries + d.leads, label: d.date }))}
+                label={t("inquiriesAndLeads")}
+                height={132}
+              />
+            </div>
+
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("conversionFunnel")}</h3>
+              <div className="space-y-2">
+                {conversionFunnel.map((stage) => {
+                  const pct = stage.conversion_rate;
+                  return (
+                    <div key={stage.stage}>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span>{stage.stage}</span>
+                        <span className="font-semibold">{stage.count}</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                        <div className="h-full rounded-full bg-indigo-600" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-gray-500">{pct.toFixed(1)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("categoryStats")}</h3>
+              <BarChart
+                data={categoryStats.map((d) => ({ value: d.count, label: d.property_type }))}
+                label={t("propertiesByType")}
+                height={132}
+              />
+            </div>
+
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("locationStats")}</h3>
+              <BarChart
+                data={locationStats.map((d) => ({ value: d.count, label: d.city }))}
+                label={t("propertiesByLocation")}
+                height={132}
+              />
+            </div>
+
+            <div className="compact-card">
+              <h3 className="mb-2 text-sm font-semibold">{t("unitStatus")}</h3>
+              <div className="space-y-2">
+                {unitStatus?.by_status.map((s) => (
+                  <div key={s.status}>
+                    <div className="mb-1 flex justify-between text-xs">
+                      <span>{t(s.status) || s.status}</span>
+                      <span className="font-semibold">{s.count}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                      <div className="h-full rounded-full bg-indigo-600" style={{ width: `${s.percentage}%` }} />
+                    </div>
+                    <span className="text-[10px] text-gray-500">{s.percentage.toFixed(1)}%</span>
+                  </div>
+                ))}
+                <div className="mt-2 border-t pt-2">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span>{t("totalUnits")}</span>
+                    <span>{unitStatus?.total_units || 0}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </PageShell>
   );
 }

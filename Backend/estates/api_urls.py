@@ -8,6 +8,10 @@ from .viewsets import (
     SavedSearchViewSet,
     LeadViewSet,
     LeadMatchViewSet,
+    BrokerViewSet,
+    OwnerViewSet,
+    DataQualityViewSet,
+    ScanInboxViewSet,
     ProjectViewSet,
     ProjectUnitViewSet,
     AnalyticsViewSet,
@@ -22,6 +26,10 @@ router.register(r"applications", TenantApplicationViewSet, basename="estate-appl
 router.register(r"saved-searches", SavedSearchViewSet, basename="estate-saved-search")
 router.register(r"leads", LeadViewSet, basename="estate-lead")
 router.register(r"lead-matches", LeadMatchViewSet, basename="estate-lead-match")
+router.register(r"brokers", BrokerViewSet, basename="estate-broker")
+router.register(r"owners", OwnerViewSet, basename="estate-owner")
+router.register(r"data-quality", DataQualityViewSet, basename="estate-data-quality")
+router.register(r"scan-inbox", ScanInboxViewSet, basename="estate-scan-inbox")
 router.register(r"projects", ProjectViewSet, basename="estate-project")
 router.register(r"project-units", ProjectUnitViewSet, basename="estate-project-unit")
 router.register(r"analytics", AnalyticsViewSet, basename="estate-analytics")

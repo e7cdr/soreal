@@ -5,7 +5,7 @@ import { submitReport } from "@/lib/api";
 import { useTranslation } from "@/app/components/LanguageProvider";
 
 export default function ReportPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
@@ -81,23 +81,23 @@ export default function ReportPage() {
     );
   }
 
-  const idTypeLabel = t(form.id_type, {}, {});
-  const categoryLabel = t(form.category, {}, {});
+  const idTypeLabel = t(form.id_type);
+  const categoryLabel = t(form.category);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">{t("submitReportTitle")}</h1>
-      <p className="mb-6 text-gray-600">
+    <div className="mx-auto max-w-2xl p-2">
+      <h1 className="mb-3 text-xl font-bold">{t("submitReportTitle")}</h1>
+      <p className="mb-3 text-sm text-[var(--text-muted)]">
         {t("reportSubtitle")}
       </p>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-700">
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4 bg-gray-50 p-6 rounded-lg">
+      <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">

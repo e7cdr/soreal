@@ -97,6 +97,27 @@ class Property(ClusterableModel):
     )
 
     created_by = models.CharField(max_length=200, blank=True, null=True)
+    broker = models.ForeignKey(
+        "estates.Broker",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="properties",
+    )
+    owner = models.ForeignKey(
+        "estates.Owner",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="properties",
+    )
+    source_lead = models.OneToOneField(
+        "estates.Lead",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_property",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -139,6 +160,8 @@ class Property(ClusterableModel):
             heading="Location",
         ),
         FieldPanel("amenities"),
+        FieldPanel("broker"),
+        FieldPanel("owner"),
         InlinePanel("images", label="Images"),
         FieldPanel("created_by", read_only=True),
     ]
@@ -340,6 +363,9 @@ class Lead(models.Model):
         ("new", "New"),
         ("contacted", "Contacted"),
         ("matched", "Matched"),
+        ("completed", "Completed"),
+        ("unavailable", "No Longer Available"),
+        ("ignored", "Ignored User"),
         ("closed", "Closed"),
     ]
 
@@ -350,7 +376,15 @@ class Lead(models.Model):
     ]
 
     name = models.CharField(max_length=200)
-    phone = models.CharField(max_length=50)
+    phone = models.CharField(max_length=50, blank=True)
+    source_sender = models.CharField(max_length=200, blank=True, default="")
+    broker = models.ForeignKey(
+        "estates.Broker",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requests",
+    )
     whatsapp_group = models.CharField(
         max_length=200, blank=True, null=True,
         help_text="WhatsApp group name where this lead was found",
@@ -370,20 +404,29 @@ class Lead(models.Model):
     )
     min_bedrooms = models.PositiveIntegerField(blank=True, null=True)
     max_bedrooms = models.PositiveIntegerField(blank=True, null=True)
+    min_bathrooms = models.PositiveIntegerField(blank=True, null=True)
+    max_bathrooms = models.PositiveIntegerField(blank=True, null=True)
     min_price = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
     max_price = models.DecimalField(max_digits=14, decimal_places=2, blank=True, null=True)
+    budget_currency = models.CharField(max_length=10, blank=True, null=True)
+    preferred_location = models.CharField(max_length=200, blank=True, null=True)
+    furnishing = models.CharField(max_length=20, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
 
     notes = models.TextField(blank=True, null=True)
+    attachments = models.JSONField(default=list, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="new")
+    status_before_ignored = models.CharField(max_length=20, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     panels = [
         FieldPanel("name"),
         FieldPanel("phone"),
+        FieldPanel("source_sender", read_only=True),
+        FieldPanel("broker"),
         FieldPanel("whatsapp_group"),
         FieldPanel("source"),
         MultiFieldPanel(
@@ -392,8 +435,13 @@ class Lead(models.Model):
                 FieldPanel("property_type"),
                 FieldPanel("min_bedrooms"),
                 FieldPanel("max_bedrooms"),
+                FieldPanel("min_bathrooms"),
+                FieldPanel("max_bathrooms"),
                 FieldPanel("min_price"),
                 FieldPanel("max_price"),
+                FieldPanel("budget_currency"),
+                FieldPanel("preferred_location"),
+                FieldPanel("furnishing"),
                 FieldPanel("city"),
                 FieldPanel("province"),
             ],
@@ -410,6 +458,130 @@ class Lead(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Lead"
         verbose_name_plural = "Leads"
+
+
+@register_snippet
+class Broker(models.Model):
+    """A broker/contact in the shared SOREAL directory."""
+
+    name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=50, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    company = models.CharField(max_length=200, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("phone"),
+        FieldPanel("email"),
+        FieldPanel("company"),
+        FieldPanel("notes"),
+    ]
+
+    def __str__(self):
+        return f"{self.name} ({self.company})" if self.company else self.name
+
+    class Meta:
+        ordering = ["name"]
+
+
+@register_snippet
+class Owner(models.Model):
+    """A property owner or project owner in the SOREAL directory."""
+
+    name = models.CharField(max_length=200)
+    phone = models.CharField(max_length=50, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    company = models.CharField(max_length=200, blank=True, default="")
+    identification = models.CharField(max_length=50, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("phone"),
+        FieldPanel("email"),
+        FieldPanel("company"),
+        FieldPanel("identification"),
+        FieldPanel("notes"),
+    ]
+
+    def __str__(self):
+        return f"{self.name} ({self.company})" if self.company else self.name
+
+    class Meta:
+        ordering = ["name"]
+
+
+class WhatsAppIgnoredUser(models.Model):
+    """A WhatsApp sender excluded from all future chat imports."""
+
+    sender_key = models.CharField(max_length=220, unique=True)
+    sender_name = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sender_name"]
+        verbose_name = "Ignored WhatsApp sender"
+        verbose_name_plural = "Ignored WhatsApp senders"
+
+    def __str__(self):
+        return self.sender_name
+
+
+class ScanInboxItem(models.Model):
+    """A scanned WhatsApp message that needs a person to classify it."""
+
+    STATUS_CHOICES = [
+        ("pending", "Needs review"),
+        ("request", "Saved as request"),
+        ("broker", "Saved as broker"),
+        ("estate", "Saved as estate"),
+        ("dismissed", "Dismissed"),
+    ]
+
+    fingerprint = models.CharField(max_length=64, unique=True)
+    whatsapp_group = models.CharField(max_length=200)
+    sender = models.CharField(max_length=200, blank=True, default="")
+    message_date = models.CharField(max_length=20, blank=True, default="")
+    message_time = models.CharField(max_length=30, blank=True, default="")
+    message = models.TextField(blank=True, default="")
+    attachments = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    lead = models.ForeignKey(
+        Lead,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scan_inbox_items",
+    )
+    broker = models.ForeignKey(
+        Broker,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scan_inbox_items",
+    )
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scan_inbox_items",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "WhatsApp scan inbox item"
+        verbose_name_plural = "WhatsApp scan inbox items"
+
+    def __str__(self):
+        return f"{self.sender}: {self.message[:80]}"
 
 
 @register_snippet
@@ -478,6 +650,20 @@ class Project(models.Model):
     slug = models.SlugField(max_length=200, unique=True, blank=True)
     description = RichTextField(blank=True, null=True)
     developer = models.CharField(max_length=200, blank=True, null=True)
+    broker = models.ForeignKey(
+        "estates.Broker",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
+    owner = models.ForeignKey(
+        "estates.Owner",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="projects",
+    )
     address = models.CharField(max_length=255, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     province = models.CharField(max_length=100, blank=True, null=True)
@@ -499,6 +685,8 @@ class Project(models.Model):
                 FieldPanel("slug"),
                 FieldPanel("description"),
                 FieldPanel("developer"),
+                FieldPanel("broker"),
+                FieldPanel("owner"),
             ],
             heading="Project Info",
         ),
@@ -633,4 +821,3 @@ class ProjectBulkUpload(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Project Bulk Upload"
         verbose_name_plural = "Project Bulk Uploads"
-

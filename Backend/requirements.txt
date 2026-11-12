@@ -5,3 +5,4 @@ django-filter>=23,<24
 django-cors-headers>=4.3,<4.4
 python-dotenv>=1.0,<1.1
 Pillow>=11,<12
+openpyxl>=3.1,<4

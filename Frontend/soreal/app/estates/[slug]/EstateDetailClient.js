@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { submitInquiry, downloadSocialPost } from "@/lib/api";
+import {
+  submitInquiry,
+  downloadSocialPost,
+  fetchBrokers,
+  fetchOwners,
+  updateEstate,
+} from "@/lib/api";
 import dynamic from "next/dynamic";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import {
@@ -11,6 +17,7 @@ import {
   removeFavorite,
 } from "@/lib/favorites";
 import { Heart } from "lucide-react";
+import { DOMINICAN_CITIES, DOMINICAN_PROVINCES } from "@/lib/locations";
 
 const PropertyMap = dynamic(
   () => import("@/app/components/PropertyMap").then((mod) => mod.default),
@@ -18,24 +25,78 @@ const PropertyMap = dynamic(
 );
 
 export default function EstateDetailClient({ estate }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const coverImage =
     estate.images?.find((img) => img.is_cover)?.image_url ||
     estate.images?.[0]?.image_url ||
     null;
 
-  const typeLabel = t(estate.property_type, {}, {});
-  const listingLabel = t(estate.listing_type, {}, {});
+  const typeLabel = t(estate.property_type);
+  const listingLabel = t(estate.listing_type);
 
   const [isFav, setIsFav] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [canManage, setCanManage] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [savingEstate, setSavingEstate] = useState(false);
+  const [estateDraft, setEstateDraft] = useState(null);
+  const [brokers, setBrokers] = useState([]);
+  const [owners, setOwners] = useState([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsFav(isFavorite(estate.id));
+    setCanManage(Boolean(localStorage.getItem("auth_token")));
   }, [estate.id]);
+
+  function startEditing() {
+    setEstateDraft({
+      title: estate.title || "",
+      description: estate.description || "",
+      property_type: estate.property_type || "apartment",
+      listing_type: estate.listing_type || "sale",
+      price: estate.price ?? "",
+      currency: estate.currency || "DOP",
+      bedrooms: estate.bedrooms ?? "",
+      bathrooms: estate.bathrooms ?? "",
+      area_sqm: estate.area_sqm ?? "",
+      address: estate.address || "",
+      city: estate.city || "",
+      province: estate.province || "",
+      status: estate.status || "draft",
+      broker: estate.broker || "",
+      owner: estate.owner || "",
+    });
+    setError(null);
+    setEditing(true);
+    fetchBrokers().then((response) => setBrokers(response.results || [])).catch((loadError) => setError(loadError.message));
+    fetchOwners().then((response) => setOwners(response.results || [])).catch((loadError) => setError(loadError.message));
+  }
+
+  async function saveEstateChanges(event) {
+    event.preventDefault();
+    setSavingEstate(true);
+    setError(null);
+    try {
+      await updateEstate(estate.slug, {
+        ...estateDraft,
+        price: estateDraft.price === "" ? null : Number(estateDraft.price),
+        bedrooms: estateDraft.bedrooms === "" ? null : Number(estateDraft.bedrooms),
+        bathrooms: estateDraft.bathrooms === "" ? null : Number(estateDraft.bathrooms),
+        area_sqm: estateDraft.area_sqm === "" ? null : Number(estateDraft.area_sqm),
+        broker: estateDraft.broker ? Number(estateDraft.broker) : null,
+        owner: estateDraft.owner ? Number(estateDraft.owner) : null,
+      });
+      window.location.reload();
+    } catch (saveError) {
+      setError(saveError.message || t("error"));
+    } finally {
+      setSavingEstate(false);
+    }
+  }
 
   const toggleFavorite = () => {
     if (isFav) {
@@ -121,6 +182,15 @@ export default function EstateDetailClient({ estate }) {
         <div className="space-y-6">
           <h1 className="text-3xl font-bold">{estate.title}</h1>
           <div className="flex items-center gap-2">
+            {canManage && (
+              <button
+                type="button"
+                onClick={editing ? () => setEditing(false) : startEditing}
+                className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
+              >
+                {editing ? t("cancel") : t("editEstate")}
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -144,6 +214,59 @@ export default function EstateDetailClient({ estate }) {
               <span className="text-blue-600">📱</span>
             </button>
           </div>
+          {editing && estateDraft && (
+            <form onSubmit={saveEstateChanges} className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+              <h2 className="font-semibold">{t("editEstate")}</h2>
+              {[
+                ["title", t("estateTitle"), "text"],
+                ["property_type", t("propertyType"), "propertyType"],
+                ["listing_type", t("listingType"), "listingType"],
+                ["status", t("status"), "status"],
+                ["price", t("price"), "number"],
+                ["currency", t("currency"), "text"],
+                ["bedrooms", t("bedrooms"), "number"],
+                ["bathrooms", t("bathrooms"), "number"],
+                ["area_sqm", t("areaSqm"), "number"],
+                ["address", t("address"), "text"],
+                ["province", t("province"), "province"],
+                ["city", t("city"), "city"],
+                ["broker", t("brokerName"), "broker"],
+                ["owner", t("owner"), "owner"],
+              ].map(([field, label, type]) => {
+                const options = type === "propertyType"
+                  ? ["apartment", "house", "villa", "land", "commercial"].map((value) => ({ value, label: t(value) }))
+                  : type === "listingType"
+                    ? ["sale", "rent"].map((value) => ({ value, label: t(`listing_${value}`) }))
+                    : type === "status"
+                      ? ["draft", "available", "reserved", "sold", "rented", "inactive"].map((value) => ({ value, label: t(value) }))
+                      : type === "province"
+                        ? DOMINICAN_PROVINCES.map((value) => ({ value, label: value }))
+                        : type === "city"
+                          ? DOMINICAN_CITIES.map((value) => ({ value, label: value }))
+                          : type === "broker"
+                            ? brokers.map((item) => ({ value: item.id, label: item.name }))
+                            : type === "owner"
+                              ? owners.map((item) => ({ value: item.id, label: item.name }))
+                              : null;
+                return (
+                  <label key={field} className="block text-sm">
+                    <span className="mb-1 block font-medium">{label}</span>
+                    {options ? (
+                      <select value={estateDraft[field] ?? ""} onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]">
+                        {["broker", "owner", "province", "city"].includes(type) && <option value="">{type === "broker" ? t("noBrokerLinked") : type === "owner" ? t("noOwnerLinked") : "—"}</option>}
+                        {estateDraft[field] && !options.some((option) => String(option.value) === String(estateDraft[field])) && <option value={estateDraft[field]}>{estateDraft[field]}</option>}
+                        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    ) : (
+                      <input type={type} min={type === "number" ? "0" : undefined} step={field === "price" ? "0.01" : "1"} value={estateDraft[field]} onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" />
+                    )}
+                  </label>
+                );
+              })}
+              <label className="block text-sm"><span className="mb-1 block font-medium">{t("description")}</span><textarea rows={4} value={estateDraft.description} onChange={(event) => setEstateDraft({ ...estateDraft, description: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" /></label>
+              <button disabled={savingEstate} className="rounded-lg bg-[var(--green)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{savingEstate ? t("saving") : t("saveChanges")}</button>
+            </form>
+          )}
           {coverImage ? (
             <img
               src={coverImage}
@@ -161,6 +284,8 @@ export default function EstateDetailClient({ estate }) {
               src={img.image_url}
               alt={img.caption || "Image"}
               className="mt-2 w-32 h-32 object-cover rounded"
+              loading="lazy"
+              decoding="async"
             />
           ))}
           <div className="space-y-2">
@@ -266,7 +391,7 @@ export default function EstateDetailClient({ estate }) {
                     onChange={handleChange}
                     className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
                   >
-                    <option value="ID_Card">{t("idCard", {}, {})}</option>
+                    <option value="ID_Card">{t("idCard")}</option>
                     <option value="Passport">Passport</option>
                   </select>
                 </div>

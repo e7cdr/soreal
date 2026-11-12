@@ -1,115 +1,174 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  Building2,
+  ChartNoAxesCombined,
+  ChevronDown,
+  CircleHelp,
+  FilePlus2,
+  Heart,
+  Home,
+  LogIn,
+  LogOut,
+  ListChecks,
+  Menu,
+  Moon,
+  Sun,
+  Users,
+  X,
+} from "lucide-react";
+import { useTheme } from "@/app/components/ThemeProvider";
 import { useTranslation } from "@/app/components/LanguageProvider";
 
+const primaryLinks = [
+  { href: "/", label: "home", icon: Home },
+  { href: "/estates", label: "estates", icon: Building2 },
+  { href: "/projects", label: "projects", icon: Building2 },
+  { href: "/blacklist", label: "blacklist", icon: Users },
+  { href: "/analytics", label: "analytics", icon: ChartNoAxesCombined },
+];
+
+const moreLinks = [
+  { href: "/favorites", label: "favorites", icon: Heart },
+  { href: "/report", label: "submitReport", icon: FilePlus2 },
+  { href: "/requests", label: "requestQueue", icon: ListChecks },
+  { href: "/brokers", label: "brokers", icon: Users },
+  { href: "/owners", label: "owners", icon: Users },
+  { href: "/data-quality", label: "dataQuality", icon: ChartNoAxesCombined },
+  { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
+  { href: "/lead-matches", label: "leadMatches", icon: ChartNoAxesCombined },
+  { href: "/whatsapp-import", label: "whatsappImport", icon: FilePlus2 },
+  { href: "/about", label: "about", icon: CircleHelp },
+  { href: "/account", label: "account", icon: Users },
+];
+
 export default function Navigation() {
-  const { lang, changeLanguage, t } = useTranslation();
+  const pathname = usePathname();
+  const { lang, changeLanguage, translate } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
+  const [hasAuth, setHasAuth] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasAuth(Boolean(localStorage.getItem("auth_token")));
+  }, [pathname]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMenuOpen(false);
+  }, [pathname]);
+
+  const isActive = (href) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const renderLink = ({ href, label, icon: Icon }) => (
+    <Link
+      key={href}
+      href={href}
+      aria-current={isActive(href) ? "page" : undefined}
+      className={`nav-link${isActive(href) ? " nav-link-active" : ""}`}
+    >
+      <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
+      <span>{translate(label)}</span>
+    </Link>
+  );
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    window.location.href = "/login";
+  };
 
   return (
-    <nav className="bg-white border-b p-4">
-      <ul className="flex flex-wrap gap-4 items-center">
-        <li>
-          <Link href="/" className="hover:text-blue-600">
-            {t("home")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/about" className="hover:text-blue-600">
-            {t("about")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/estates" className="hover:text-blue-600">
-            {t("estates")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/favorites" className="hover:text-blue-600">
-            {t("favorites")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/blacklist" className="hover:text-blue-600">
-            {t("blacklist")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/report" className="hover:text-blue-600">
-            {t("submitReport")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/leads" className="hover:text-blue-600">
-            {t("leads")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/lead-matches" className="hover:text-blue-600">
-            {t("leadMatches")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/projects" className="hover:text-blue-600">
-            {t("projects")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/analytics" className="hover:text-blue-600">
-            {t("analytics")}
-          </Link>
-        </li>
-        <li>
-          <Link href="/whatsapp-import" className="hover:text-blue-600">
-            {t("whatsappImport")}
-          </Link>
-        </li>
-        <li className="flex items-center gap-2">
-          <button
-            onClick={() => changeLanguage(lang === "en" ? "es" : "en")}
-            className={`text-sm font-medium rounded px-2 py-1 border ${
-              lang === "en" ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-gray-100 text-gray-700 border-gray-300"
-            }`}
-          >
-            {lang === "en" ? "ES" : "EN"}
-          </button>
-        </li>
-        {typeof window !== "undefined" && localStorage.getItem("auth_token") ? (
-          <>
-            <li>
-              <Link
-                href="/blacklist/moderate"
-                className="hover:text-blue-600"
+    <header className="app-header">
+      <div className="app-header-inner">
+        <Link href="/" className="brand" aria-label="SOREAL home">
+          <span className="brand-mark">
+            <Building2 aria-hidden="true" size={21} strokeWidth={2.2} />
+          </span>
+          <span className="brand-name">soreal</span>
+          <span className="brand-caption">PROPERTY, MADE CLEAR</span>
+        </Link>
+
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <X size={21} /> : <Menu size={21} />}
+        </button>
+
+        <div className={`header-content${menuOpen ? " header-content-open" : ""}`}>
+          <nav className="primary-nav" aria-label="Main navigation">
+            {primaryLinks.map(renderLink)}
+            <details className="more-menu">
+              <summary
+                className={`nav-link${moreLinks.some(({ href }) => isActive(href)) ? " nav-link-active" : ""}`}
               >
-                {t("moderation")}
-              </Link>
-            </li>
-            <li>
-              <button
-                onClick={() => {
-                  localStorage.removeItem("auth_token");
-                  localStorage.removeItem("auth_user");
-                  window.location.href = "/login";
-                }}
-                className="text-red-600 hover:underline text-sm"
-              >
-                {t("logout", { username: "Staff" })}
-              </button>
-            </li>
-          </>
-        ) : (
-          <li>
-            <Link href="/login" className="hover:text-blue-600">
-              {t("staffLogin")}
-            </Link>
-          </li>
-        )}
-        <li>
-          <Link href="/account" className="hover:text-blue-600">
-            {t("account")}
-          </Link>
-        </li>
-      </ul>
-    </nav>
+                <span>{lang === "es" ? "Más" : "More"}</span>
+                <ChevronDown aria-hidden="true" size={15} />
+              </summary>
+              <div className="more-menu-panel">
+                {moreLinks.map(renderLink)}
+                {hasAuth ? (
+                  <>
+                    {renderLink({
+                      href: "/blacklist/moderate",
+                      label: "moderation",
+                      icon: Users,
+                    })}
+                    <button
+                      type="button"
+                      className="nav-link nav-logout"
+                      onClick={handleLogout}
+                    >
+                      <LogOut aria-hidden="true" size={17} />
+                      <span>{translate("logout", { username: "Staff" })}</span>
+                    </button>
+                  </>
+                ) : (
+                  renderLink({
+                    href: "/login",
+                    label: "staffLogin",
+                    icon: LogIn,
+                  })
+                )}
+              </div>
+            </details>
+          </nav>
+
+          <div className="header-actions">
+            <button
+              type="button"
+              onClick={() => changeLanguage(lang === "en" ? "es" : "en")}
+              className="header-icon-button language-toggle"
+              aria-label={lang === "en" ? "Cambiar a español" : "Switch to English"}
+              title={lang === "en" ? "Switch to Spanish" : "Switch to English"}
+            >
+              {lang === "en" ? "ES" : "EN"}
+            </button>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="header-icon-button"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === "dark" ? "Light mode" : "Dark mode"}
+            >
+              {theme === "dark" ? (
+                <Sun aria-hidden="true" size={18} />
+              ) : (
+                <Moon aria-hidden="true" size={18} />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }

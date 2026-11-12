@@ -1,7 +1,7 @@
 import csv
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -36,7 +36,7 @@ class BlacklistedPersonViewSet(viewsets.ModelViewSet):
     Staff users see all records with full detail.
     """
 
-    queryset = BlacklistedPerson.objects.all()
+    queryset = BlacklistedPerson.objects.prefetch_related("images__image")
     permission_classes = [IsStaffOrReadOnly, BlacklistSectionAccess]
     lookup_field = "case_id"
 
@@ -56,6 +56,8 @@ class BlacklistedPersonViewSet(viewsets.ModelViewSet):
         if not _is_staff(self.request):
             # Public: only public records
             queryset = queryset.filter(visibility="public")
+        else:
+            queryset = queryset.prefetch_related("reporters")
 
         # Query params
         q = self.request.query_params.get("q", None)
@@ -103,19 +105,28 @@ class BlacklistedPersonViewSet(viewsets.ModelViewSet):
         if not _is_staff(request):
             queryset = queryset.filter(visibility="public")
 
-        total = queryset.count()
-        this_month = queryset.filter(
-            created_at__year=timezone.now().year,
-            created_at__month=timezone.now().month,
-        ).count()
-        by_status = {}
-        for status_key, _ in BlacklistedPerson.STATUS_CHOICES:
-            by_status[status_key] = queryset.filter(status=status_key).count()
+        now = timezone.now()
+        status_choices = BlacklistedPerson.STATUS_CHOICES
+        stats = queryset.aggregate(
+            total=Count("pk"),
+            this_month=Count(
+                "pk",
+                filter=Q(created_at__year=now.year, created_at__month=now.month),
+            ),
+            **{
+                f"status_{status_key}": Count("pk", filter=Q(status=status_key))
+                for status_key, _ in status_choices
+            },
+        )
+        by_status = {
+            status_key: stats[f"status_{status_key}"]
+            for status_key, _ in status_choices
+        }
 
         return Response(
             {
-                "total": total,
-                "this_month": this_month,
+                "total": stats["total"],
+                "this_month": stats["this_month"],
                 "by_status": by_status,
             }
         )

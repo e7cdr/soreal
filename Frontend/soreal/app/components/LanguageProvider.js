@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { getLanguage, setLanguage, t } from "@/lib/i18n";
 
 const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(() => getLanguage());
+  const [lang, setLang] = useState("en");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLang(getLanguage());
+  }, []);
 
   useEffect(() => {
     setLanguage(lang);
@@ -16,7 +21,7 @@ export function LanguageProvider({ children }) {
     setLang(newLang);
   };
 
-  const translate = (key, params = {}) => t(key, lang, params);
+  const translate = useCallback((key, params = {}) => t(key, lang, params), [lang]);
 
   return (
     <LanguageContext.Provider value={{ lang, changeLanguage, translate, t }}>

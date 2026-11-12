@@ -8,16 +8,13 @@ import {
   dismissLeadMatch,
 } from "@/lib/api";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import PageShell from "@/app/components/PageShell";
 
 export default function LeadMatchesPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    loadMatches();
-  }, []);
 
   async function loadMatches() {
     setLoading(true);
@@ -30,6 +27,11 @@ export default function LeadMatchesPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMatches();
+  }, []);
 
   async function handleNotify(matchId) {
     try {
@@ -57,8 +59,20 @@ export default function LeadMatchesPage() {
     }
   }
 
-  if (loading) return <div className="p-6">{t("loading")}</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (loading) {
+    return (
+      <PageShell title={t("leadMatches")} description={t("leadMatchesDescription")}>
+        <div className="compact-card text-sm text-[var(--text-muted)]">{t("loading")}</div>
+      </PageShell>
+    );
+  }
+  if (error) {
+    return (
+      <PageShell title={t("leadMatches")} description={t("leadMatchesDescription")}>
+        <div className="compact-card text-sm text-red-600">{error}</div>
+      </PageShell>
+    );
+  }
 
   const statusBadge = (status) => {
     const colors = {
@@ -68,78 +82,71 @@ export default function LeadMatchesPage() {
       dismissed: "bg-gray-100 text-gray-800",
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[status]}`}>
+      <span className={`rounded-full px-2 py-1 text-xs font-medium ${colors[status]}`}>
         {status}
       </span>
     );
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{t("leadMatches", {}, {})}</h1>
-        <Link
-          href="/leads"
-          className="text-blue-600 hover:underline text-sm"
-        >
-          ← {t("backToLeads", {}, {})}
+    <PageShell
+      title={t("leadMatches")}
+      description={t("leadMatchesDescription")}
+      actions={(
+        <Link href="/requests" className="toolbar-button">
+          ← {t("backToRequests")}
         </Link>
-      </div>
-
-      <p className="text-gray-600 mb-6">
-        {t("leadMatchesDescription", {}, {})}
-      </p>
-
-      {matches.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          No matches yet. When a new lead or property is added, matches
-          will appear here automatically.
-        </div>
       )}
-
-      {matches.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b text-left">
-                <th className="p-3">{t("lead")}</th>
-                <th className="p-3">{t("phone")}</th>
-                <th className="p-3">{t("property")}</th>
-                <th className="p-3">Score</th>
-                <th className="p-3">Reasons</th>
-                <th className="p-3">{t("status")}</th>
-                <th className="p-3">{t("actions")}</th>
+    >
+      {matches.length === 0 ? (
+        <div className="compact-card py-10 text-center text-sm text-[var(--text-muted)]">
+          {t("noMatches")}
+        </div>
+      ) : (
+        <div className="table-scroll">
+          <table className="w-full min-w-[860px] border-collapse text-left text-sm">
+            <thead className="bg-[var(--surface-muted)] text-xs uppercase text-[var(--text-muted)]">
+              <tr>
+                <th className="px-3 py-2">{t("lead")}</th>
+                <th className="px-3 py-2">{t("phone")}</th>
+                <th className="px-3 py-2">{t("property")}</th>
+                <th className="px-3 py-2">{t("score")}</th>
+                <th className="px-3 py-2">{t("reasons")}</th>
+                <th className="px-3 py-2">{t("status")}</th>
+                <th className="px-3 py-2">{t("actions")}</th>
               </tr>
             </thead>
             <tbody>
               {matches.map((m) => (
-                <tr key={m.id} className="border-b">
-                  <td className="p-3">{m.lead_name}</td>
-                  <td className="p-3">{m.lead_phone}</td>
-                  <td className="p-3">
-                    <Link href={`/estates/${m.property_slug}`}>
+                <tr key={m.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2 font-medium">{m.lead_name}</td>
+                  <td className="px-3 py-2">{m.lead_phone}</td>
+                  <td className="px-3 py-2">
+                    <Link href={`/estates/${m.property_slug}`} className="font-semibold text-[var(--green)] hover:underline">
                       {m.property_title}
                     </Link>
                   </td>
-                  <td className="p-3">
+                  <td className="px-3 py-2">
                     <span className="font-mono">{m.match_score}</span>
                   </td>
-                  <td className="p-3 text-sm">{m.match_reasons}</td>
-                  <td className="p-3">{statusBadge(m.status)}</td>
-                  <td className="p-3">
+                  <td className="px-3 py-2 text-xs">{m.match_reasons}</td>
+                  <td className="px-3 py-2">{statusBadge(m.status)}</td>
+                  <td className="px-3 py-2">
                     {m.status === "pending" && (
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           onClick={() => handleNotify(m.id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                          className="toolbar-button toolbar-button-primary"
                         >
-                          {t("notify", {}, {})}
+                          {t("notify")}
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDismiss(m.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                          className="toolbar-button"
                         >
-                          {t("dismiss", {}, {})}
+                          {t("dismiss")}
                         </button>
                       </div>
                     )}
@@ -150,6 +157,6 @@ export default function LeadMatchesPage() {
           </table>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

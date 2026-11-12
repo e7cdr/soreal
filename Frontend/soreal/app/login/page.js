@@ -4,9 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import PageShell from "@/app/components/PageShell";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 export default function LoginPage() {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +22,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const resp = await fetch("http://localhost:8000/api/blacklist/auth/login/", {
+      const resp = await fetch(`${API_BASE_URL}/api/blacklist/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -32,7 +36,15 @@ export default function LoginPage() {
       const data = await resp.json();
       localStorage.setItem("auth_token", data.token);
       localStorage.setItem("auth_user", JSON.stringify(data.user));
-      router.push("/blacklist/moderate");
+      const requestedPath = new URLSearchParams(window.location.search).get("next");
+      let nextPath = "/blacklist/moderate";
+      if (requestedPath?.startsWith("/") && !requestedPath.startsWith("//")) {
+        const destination = new URL(requestedPath, window.location.origin);
+        if (destination.origin === window.location.origin) {
+          nextPath = `${destination.pathname}${destination.search}${destination.hash}`;
+        }
+      }
+      router.push(nextPath);
     } catch (err) {
       setError(err.message || t("error"));
     } finally {
@@ -41,55 +53,51 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="p-6 max-w-md mx-auto">
-      <div className="bg-white border rounded-lg p-8 shadow-sm">
-        <h1 className="text-2xl font-bold mb-6 text-center">{t("staffLogin")}</h1>
-        <p className="text-center text-gray-600 mb-6">
-          {t("accessPassword")}
-        </p>
+    <PageShell title={t("staffLogin")}>
+      <div className="mx-auto max-w-md">
+        <div className="compact-card">
+          <p className="mb-3 text-center text-sm text-[var(--text-muted)]">
+            {t("accessPassword")}
+          </p>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
-            <input
-              type="text"
-              name="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
-          >
-            {loading ? t("submitting") : t("unlock")}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="grid gap-3">
+            <label className="filter-field">
+              <span>Username</span>
+              <input
+                type="text"
+                name="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </label>
+            <label className="filter-field">
+              <span>Password</span>
+              <input
+                type="password"
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={loading}
+              className="toolbar-button toolbar-button-primary disabled:opacity-50"
+            >
+              {loading ? t("submitting") : t("unlock")}
+            </button>
+          </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          {t("logout", { username: "" })}
-        </p>
+        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

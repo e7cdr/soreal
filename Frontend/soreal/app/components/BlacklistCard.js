@@ -2,37 +2,37 @@ import Link from "next/link";
 import { useTranslation } from "@/app/components/LanguageProvider";
 
 export default function BlacklistCard({ case: caseData }) {
-  const { t } = useTranslation();
-  const statusLabel = t(caseData.status, {}, {});
-  const categoryLabel = t(caseData.category, {}, {});
-  const idTypeLabel = t(caseData.id_type, {}, {});
+  const { translate: t } = useTranslation();
+  const statusLabel = t(caseData.status);
+  const categoryLabel = t(caseData.category);
+  const idTypeLabel = t(caseData.id_type);
 
   return (
-    <article className="border rounded-lg p-4 hover:shadow-md transition">
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="font-bold text-lg">
+    <article className="compact-card transition hover:shadow-md">
+      <div className="mb-1.5 flex items-start justify-between gap-2">
+        <h3 className="text-base font-bold">
           {caseData.full_name || t("name")}
         </h3>
-        <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+        <span className="rounded bg-[var(--surface-muted)] px-2 py-0.5 font-mono text-[10px]">
           {caseData.case_id}
         </span>
       </div>
-      <p className="text-gray-600 text-sm mb-2">
+      <p className="mb-1 text-xs text-[var(--text-muted)]">
         {idTypeLabel} · {statusLabel}
       </p>
       {caseData.incident_location && (
-        <p className="text-gray-600 text-sm mb-2">
+        <p className="mb-1 text-xs text-[var(--text-muted)]">
           {caseData.incident_location}
         </p>
       )}
       {caseData.incident_date && (
-        <p className="text-gray-600 text-sm mb-2">
+        <p className="mb-1 text-xs text-[var(--text-muted)]">
           {new Date(caseData.incident_date).toLocaleDateString()}
         </p>
       )}
       <Link
         href={`/blacklist/${caseData.case_id}`}
-        className="text-blue-600 hover:underline text-sm font-medium"
+        className="text-xs font-semibold text-[var(--green)] hover:underline"
       >
         {t("viewDetails")} →
       </Link>

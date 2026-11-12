@@ -1,7 +1,7 @@
 import { useTranslation } from "@/app/components/LanguageProvider";
 
 export default function EmptyState({ title, message }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   return (
     <div className="text-center py-12">
       <h3 className="text-lg font-medium">{title || t("noCasesFound")}</h3>

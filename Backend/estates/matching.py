@@ -41,14 +41,22 @@ def compute_match_score(lead, property):
         score += 10  # Lead didn't specify, property has bedrooms
         reasons.append("any bedrooms")
 
-    # Price match (15 points)
+    # Price match (15 points). Do not compare unlike currencies.
     if lead.min_price or lead.max_price:
         min_price = lead.min_price or 0
         max_price = lead.max_price or 999999999
-        if property.price and min_price <= property.price <= max_price:
+        currency_matches = (
+            not lead.budget_currency
+            or lead.budget_currency.upper() == property.currency.upper()
+        )
+        if (
+            currency_matches
+            and property.price
+            and min_price <= property.price <= max_price
+        ):
             score += 15
             reasons.append("price")
-        elif property.price:
+        elif currency_matches and property.price:
             # Close match (within 20%)
             if property.price <= max_price * 1.2 or property.price >= min_price * 0.8:
                 score += 5
@@ -58,10 +66,29 @@ def compute_match_score(lead, property):
         reasons.append("any price")
 
     # Location match (10 points)
-    if lead.city and lead.city.lower() == property.city.lower():
+    preferred_locations = [
+        location.strip().lower()
+        for location in (lead.preferred_location or "").split(",")
+        if location.strip()
+    ]
+    property_location = " ".join(
+        filter(
+            None,
+            [
+                property.city,
+                property.address,
+                property.title,
+                str(property.description or ""),
+            ],
+        )
+    ).lower()
+    if any(location in property_location for location in preferred_locations):
+        score += 10
+        reasons.append("preferred location")
+    elif lead.city and lead.city.lower() == (property.city or "").lower():
         score += 10
         reasons.append("city")
-    elif lead.province and lead.province.lower() == property.province.lower():
+    elif lead.province and lead.province.lower() == (property.province or "").lower():
         score += 5
         reasons.append("province")
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "@/app/components/LanguageProvider";
 
 export default function UnlockForm({ onUnlock }) {
-  const { t } = useTranslation();
+  const { translate: t } = useTranslation();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
