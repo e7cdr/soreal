@@ -12,6 +12,7 @@ import {
   CircleHelp,
   DollarSign,
   FilePlus2,
+  FileText,
   Heart,
   Home,
   LogIn,
@@ -78,6 +79,7 @@ export default function Navigation() {
     { href: "/scan-inbox", label: "scanInbox", icon: FilePlus2 },
     { href: "/marketing/calendar", label: "marketingCalendar", icon: Calendar },
     { href: "/marketing/ads", label: "adCampaigns", icon: DollarSign },
+    { href: "/marketing/prompts", label: "aiPrompts", icon: FileText },
     {
       href: "/lead-matches",
       label: "leadMatches",
