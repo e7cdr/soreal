@@ -69,6 +69,17 @@ class Property(ClusterableModel):
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     custom_id = models.CharField(max_length=8, unique=True, editable=False)
     description = RichTextField(blank=True, null=True)
+    meta_title = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="SEO title tag. Auto-generated from title + city if left blank.",
+    )
+    meta_description = models.TextField(
+        blank=True,
+        null=True,
+        help_text="SEO meta description. Auto-generated from description if left blank.",
+    )
 
     property_type = models.CharField(
         max_length=30, choices=PROPERTY_TYPE_CHOICES, default="house"
@@ -137,6 +148,8 @@ class Property(ClusterableModel):
                 FieldPanel("slug"),
                 FieldPanel("custom_id", read_only=True),
                 FieldPanel("description"),
+                FieldPanel("meta_title"),
+                FieldPanel("meta_description"),
             ],
             heading="Basic Info",
         ),

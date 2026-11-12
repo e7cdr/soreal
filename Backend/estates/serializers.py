@@ -48,6 +48,8 @@ class PropertySerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "meta_title",
+            "meta_description",
             "property_type",
             "listing_type",
             "price",

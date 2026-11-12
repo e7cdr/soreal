@@ -317,6 +317,10 @@ export const translations = {
     shareFacebook: "Share on Facebook",
     shareFacebookTitle: "Check out this property on SOREAL",
     viewOriginal: "View original listing",
+    seoTitle: "SEO Title",
+    seoDescription: "SEO Description",
+    seoTitleHelp: "Search engine title tag. Auto-generated from title + city if left blank.",
+    seoDescriptionHelp: "Search engine meta description. Auto-generated from description if left blank.",
 
     // Blacklist
     listaNegra: "Lista Negra",
@@ -826,6 +830,10 @@ export const translations = {
     shareFacebook: "Compartir en Facebook",
     shareFacebookTitle: "Mira esta propiedad en SOREAL",
     viewOriginal: "Ver listado original",
+    seoTitle: "Título SEO",
+    seoDescription: "Descripción SEO",
+    seoTitleHelp: "Etiqueta de título para motores de búsqueda. Se genera automáticamente desde el título y la ciudad si se deja en blanco.",
+    seoDescriptionHelp: "Descripción meta para motores de búsqueda. Se genera automáticamente desde la descripción si se deja en blanco.",
 
     // Blacklist
     listaNegra: "Lista Negra",

@@ -7,6 +7,7 @@ from wagtail import urls as wagtail_urls
 from wagtail.documents import urls as wagtaildocs_urls
 
 from search import views as search_views
+from estates import views as estate_views
 
 urlpatterns = [
     path("django-admin/", admin.site.urls),
@@ -15,6 +16,8 @@ urlpatterns = [
     path("search/", search_views.search, name="search"),
     path("api/blacklist/", include("blacklist.api_urls")),
     path("api/estates/", include("estates.api_urls")),
+    path("robots.txt", estate_views.robots_txt, name="robots_txt"),
+    path("sitemap.xml", estate_views.sitemap_xml, name="sitemap_xml"),
 ]
 
 

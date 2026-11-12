@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Disallow: /django-admin/
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: /sitemap.xml
