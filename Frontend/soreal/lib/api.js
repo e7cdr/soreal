@@ -1,5 +1,12 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return "http://localhost:8000";
+}
 
 function getHeaders() {
   const headers = {};
@@ -30,7 +37,7 @@ export async function apiFetch(path, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...options,
     headers,
   });
@@ -102,11 +109,9 @@ export async function submitReport(data) {
 }
 
 export async function exportBlacklistCSV() {
-  const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
   const token = localStorage.getItem("auth_token");
   const response = await fetch(
-    `${API_BASE_URL}/api/blacklist/persons/export_csv/`,
+    `${getApiBaseUrl()}/api/blacklist/persons/export_csv/`,
     {
       headers: {
         Authorization: `Token ${token}`,
@@ -179,11 +184,9 @@ export async function fetchSavedSearchMatches(searchId) {
 }
 
 export async function downloadSocialPost(slug) {
-  const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
   const token = localStorage.getItem("auth_token");
   const response = await fetch(
-    `${API_BASE_URL}/api/estates/properties/${slug}/social-post/`,
+    `${getApiBaseUrl()}/api/estates/properties/${slug}/social-post/`,
     {
       headers: {
         Authorization: `Token ${token}`,
@@ -230,7 +233,7 @@ export async function downloadLeadExport(format, params = {}) {
   const query = leadQueryString(params);
   const separator = query ? "&" : "";
   const response = await fetch(
-    `${API_BASE_URL}/api/estates/leads/export/?${query}${separator}file_format=${encodeURIComponent(format)}`,
+    `${getApiBaseUrl()}/api/estates/leads/export/?${query}${separator}file_format=${encodeURIComponent(format)}`,
     { headers: getHeaders() },
   );
   if (!response.ok) {
