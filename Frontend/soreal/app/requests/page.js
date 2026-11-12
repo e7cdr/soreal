@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   BarChart3,
   Check,
   Clock3,
@@ -139,6 +140,12 @@ export default function RequestQueuePage() {
   const [savingEstate, setSavingEstate] = useState(false);
   const [estateNotice, setEstateNotice] = useState("");
 
+  const [selectedLeadIds, setSelectedLeadIds] = useState(new Set());
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkAction, setBulkAction] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [unconvertedOnly, setUnconvertedOnly] = useState(false);
+
   const loadRequests = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -149,8 +156,12 @@ export default function RequestQueuePage() {
         page,
         ordering: view === "spreadsheet" ? spreadsheetSort.field : undefined,
       });
-      setLeads(response.results || []);
-      setCount(response.count || 0);
+      const fetched = response.results || [];
+      const filteredLeads = unconvertedOnly
+        ? fetched.filter((lead) => !lead.estate_id && !lead.estate_slug)
+        : fetched;
+      setLeads(filteredLeads);
+      setCount(unconvertedOnly ? filteredLeads.length : response.count || 0);
     } catch (loadError) {
       setError(loadError.message || t("error"));
     } finally {
@@ -351,6 +362,106 @@ export default function RequestQueuePage() {
     }
   }
 
+  const toggleSelect = (leadId) => {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLeadIds.size === leads.length) {
+      setSelectedLeadIds(new Set());
+    } else {
+      setSelectedLeadIds(new Set(leads.map((l) => l.id)));
+    }
+  };
+
+  const isSelected = (leadId) => selectedLeadIds.has(leadId);
+
+  const openBulkModal = (action) => {
+    setBulkAction(action);
+    setBulkModalOpen(true);
+  };
+
+  async function runBulkAction() {
+    const ids = Array.from(selectedLeadIds);
+    if (ids.length === 0) return;
+    setBulkSubmitting(true);
+    setError("");
+    try {
+      if (bulkAction === "createEstates") {
+        for (const id of ids) {
+          const lead = leads.find((l) => l.id === id);
+          if (!lead || lead.estate_slug) continue;
+          setEstateLead(lead);
+          setEstateDraft({
+            title: `${lead.property_type || t("property")} in ${lead.preferred_location || lead.city || lead.name || t("unknownRequester")}`.trim(),
+            description: (lead.notes || "").replace(/^WhatsApp request:\s*/, ""),
+            property_type: lead.property_type || "apartment",
+            listing_type: lead.listing_type === "rent" ? "rent" : "sale",
+            price: lead.max_price ?? lead.min_price ?? "",
+            currency: lead.budget_currency || "USD",
+            bedrooms: lead.min_bedrooms ?? "",
+            bathrooms: lead.min_bathrooms ?? "",
+            address: lead.preferred_location || "",
+            city: lead.city || "",
+            province: lead.province || "",
+            status: "draft",
+            broker: lead.broker || "",
+            owner: "",
+          });
+          await saveEstateBulk(lead);
+        }
+        setBulkModalOpen(false);
+        setSelectedLeadIds(new Set());
+        setNotice(t("estatesCreated", { count: ids.length }));
+      } else if (bulkAction === "markCompleted") {
+        await Promise.all(ids.map((id) => updateLeadStatus(id, "completed")));
+        setSelectedLeadIds(new Set());
+        setNotice(t("statusesUpdated", { count: ids.length }));
+      } else if (bulkAction === "markIgnored") {
+        await Promise.all(ids.map((id) => ignoreLeadUser(id)));
+        setSelectedLeadIds(new Set());
+        setNotice(t("statusesUpdated", { count: ids.length }));
+      } else if (bulkAction === "markUnavailable") {
+        await Promise.all(ids.map((id) => updateLeadStatus(id, "unavailable")));
+        setSelectedLeadIds(new Set());
+        setNotice(t("statusesUpdated", { count: ids.length }));
+      } else if (bulkAction === "reopen") {
+        await Promise.all(ids.map((id) => updateLeadStatus(id, "new")));
+        setSelectedLeadIds(new Set());
+        setNotice(t("statusesUpdated", { count: ids.length }));
+      }
+      await loadRequests();
+    } catch (bulkError) {
+      setError(bulkError.message || t("error"));
+    } finally {
+      setBulkSubmitting(false);
+      setBulkModalOpen(false);
+    }
+  }
+
+  async function saveEstateBulk(lead) {
+    if (!lead) return;
+    const payload = {
+      ...estateDraft,
+      broker: estateDraft.broker ? Number(estateDraft.broker) : null,
+      owner: estateDraft.owner ? Number(estateDraft.owner) : null,
+      price: estateDraft.price === "" ? null : Number(estateDraft.price),
+      bedrooms: estateDraft.bedrooms === "" ? null : Number(estateDraft.bedrooms),
+      bathrooms: estateDraft.bathrooms === "" ? null : Number(estateDraft.bathrooms),
+    };
+    const estate = await createEstateFromLead(lead.id, payload);
+    setLeads((current) =>
+      current.map((l) =>
+        l.id === lead.id ? { ...l, estate_id: estate.id, estate_slug: estate.slug } : l
+      )
+    );
+  }
+
   const pageCount = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
@@ -542,6 +653,28 @@ export default function RequestQueuePage() {
 
             <span className="page-toolbar-spacer" />
             <span className="page-toolbar-label">{count} {t("requests")}</span>
+            <button
+              type="button"
+              onClick={() => setUnconvertedOnly((prev) => !prev)}
+              className={`toolbar-button ${unconvertedOnly ? "toolbar-button-primary" : ""}`}
+              title={t("unconvertedOnly")}
+              aria-label={t("unconvertedOnly")}
+            >
+              <RotateCcw size={14} className="mr-1" />
+              {t("unconvertedOnly")}
+            </button>
+            {selectedLeadIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setBulkModalOpen(true)}
+                className="toolbar-button toolbar-button-primary"
+                title={t("bulkActions")}
+                aria-label={t("bulkActions")}
+              >
+                <AlertTriangle size={15} />
+                {selectedLeadIds.size}
+              </button>
+            )}
             <ToolbarMenu label={t("moreActions")}>
               <button
                 type="button"
@@ -879,6 +1012,13 @@ export default function RequestQueuePage() {
           <table className="w-full min-w-[1550px] border-collapse text-left text-sm">
             <thead className="bg-[var(--surface-muted)] text-xs uppercase text-[var(--text-muted)]">
               <tr>
+                <th className="px-3 py-3" style={{ width: 40 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedLeadIds.size === leads.length && leads.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 {[
                   { label: t("requester"), field: "name", api: "name" },
                   { label: t("phone"), field: "phone", api: "phone" },
@@ -918,6 +1058,13 @@ export default function RequestQueuePage() {
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-2" style={{ width: 40 }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected(lead.id)}
+                      onChange={() => toggleSelect(lead.id)}
+                    />
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => setSelectedLeadId(lead.id)} className="max-w-40 truncate font-semibold text-[var(--green)] hover:underline">
@@ -978,7 +1125,13 @@ export default function RequestQueuePage() {
       ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {leads.map((lead) => (
-            <article key={lead.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+            <article key={lead.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm relative">
+              <input
+                type="checkbox"
+                className="absolute top-2 right-2"
+                checked={isSelected(lead.id)}
+                onChange={() => toggleSelect(lead.id)}
+              />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setSelectedLeadId(lead.id)} className="text-left text-lg font-semibold text-[var(--green)] hover:underline">
                   {lead.name || t("unknownRequester")}
@@ -1002,8 +1155,14 @@ export default function RequestQueuePage() {
             return (
               <article
                 key={lead.id}
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm"
+                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm relative"
               >
+                <input
+                  type="checkbox"
+                  className="absolute top-2 right-2"
+                  checked={isSelected(lead.id)}
+                  onChange={() => toggleSelect(lead.id)}
+                />
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -1146,6 +1305,95 @@ export default function RequestQueuePage() {
               </article>
             );
           })}
+        </div>
+      )}
+
+      {bulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              runBulkAction();
+            }}
+            className="my-4 grid w-full max-w-md gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl"
+          >
+            <div className="flex items-center justify-between gap-3 sm:col-span-2">
+              <h2 className="text-lg font-semibold">{t("bulkActions")}</h2>
+              <button type="button" onClick={() => setBulkModalOpen(false)} className="toolbar-button">
+                <X size={16} />
+                {t("close")}
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/50">
+                <span className="font-medium">{selectedLeadIds.size} {t("leadsSelected", { count: selectedLeadIds.size })}</span>
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="text-xs text-[var(--text-muted)] hover:underline"
+                >
+                  {selectedLeadIds.size === leads.length ? t("selectNone") : t("selectAll")}
+                </button>
+              </div>
+
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => openBulkModal("createEstates")}
+                  className="w-full text-left py-2 px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-sm text-[var(--foreground)]"
+                >
+                  <Save size={14} className="mr-2" />
+                  {t("bulkCreateEstates")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openBulkModal("markCompleted")}
+                  className="w-full text-left py-2 px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-sm text-[var(--foreground)]"
+                >
+                  <Check size={14} className="mr-2" />
+                  {t("bulkMarkCompleted")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openBulkModal("markIgnored")}
+                  className="w-full text-left py-2 px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-sm text-[var(--foreground)]"
+                >
+                  <UserRoundX size={14} className="mr-2" />
+                  {t("bulkMarkIgnored")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openBulkModal("markUnavailable")}
+                  className="w-full text-left py-2 px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-sm text-[var(--foreground)]"
+                >
+                  <X size={14} className="mr-2" />
+                  {t("bulkMarkUnavailable")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openBulkModal("reopen")}
+                  className="w-full text-left py-2 px-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-sm text-[var(--foreground)]"
+                >
+                  <RotateCcw size={14} className="mr-2" />
+                  {t("bulkReopen")}
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setBulkModalOpen(false)} className="toolbar-button">
+                  {t("cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkSubmitting}
+                  className="toolbar-button toolbar-button-primary disabled:opacity-50"
+                >
+                  {bulkSubmitting ? t("saving") : t("bulkConfirm")}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       )}
 
