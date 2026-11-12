@@ -104,6 +104,8 @@ export default function RequestDetailPage() {
         address: data.preferred_location || "",
         city: data.city || "",
         province: data.province || "",
+        latitude: data.latitude || "",
+        longitude: data.longitude || "",
         status: "draft",
         broker: data.broker || "",
         owner: "",
@@ -545,6 +547,8 @@ export default function RequestDetailPage() {
               ["address", t("address"), "text"],
               ["city", t("city"), "text"],
               ["province", t("province"), "text"],
+              ["latitude", t("latitude"), "number"],
+              ["longitude", t("longitude"), "number"],
               ["owner", t("owner"), "owner"],
             ].map(([name, label, type]) => (
               <label key={name} className="block text-sm font-medium text-[var(--foreground)]">

@@ -1,0 +1,13 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/Backend/soreal-env/Scripts/python.exe",
+  "python.venvPath": "${workspaceFolder}/Backend",
+  "python.analysis.extraPaths": ["Backend"],
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.flake8Enabled": false,
+  "python.linting.mypyEnabled": false,
+  "eslint.workingDirectories": [{"mode": "auto"}],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}

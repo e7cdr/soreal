@@ -52,6 +52,7 @@ export default function Navigation() {
   }, [pathname]);
 
   useEffect(() => {
+    if (!hasAuth) return undefined;
     let active = true;
     fetchPendingMatchCount()
       .then((count) => {
@@ -63,7 +64,7 @@ export default function Navigation() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [hasAuth]);
 
   const moreLinks = [
     { href: "/favorites", label: "favorites", icon: Heart },

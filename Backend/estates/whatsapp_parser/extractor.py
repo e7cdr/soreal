@@ -288,7 +288,8 @@ def extract_lead_data(message: Dict[str, Any]) -> Dict[str, Any]:
     request = text.strip()
     listing_type = "any"
     if re.search(
-        r"\b(?:rent|rental|renting|alquiler|alquilar|rentar|renta)\b",
+        r"\b(?:rent|rental|renting|alquiler|alquilar|rentar|renta|rento|"
+        r"alquilo|rentamos|alquilamos)\b",
         request,
         re.IGNORECASE,
     ):

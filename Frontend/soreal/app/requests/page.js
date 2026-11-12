@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
-  BarChart3,
   Check,
   Clock3,
   Download,
   FileSpreadsheet,
   LayoutGrid,
   List,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -23,8 +23,11 @@ import {
   createEstateFromLead,
   createOwner,
   downloadLeadExport,
+  fetchBrokerCandidates,
   fetchLeads,
   fetchLeadSummary,
+  rescanLeadBrokerLinks,
+  saveBrokerCandidates,
   ignoreLeadUser,
   unignoreLeadUser,
   updateLeadStatus,
@@ -32,7 +35,6 @@ import {
 } from "@/lib/api";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
-import StatStrip from "@/app/components/StatStrip";
 import ToolbarMenu from "@/app/components/ToolbarMenu";
 import FilterPopover from "@/app/components/FilterPopover";
 import { DOMINICAN_CITIES, DOMINICAN_PROVINCES } from "@/lib/locations";
@@ -55,10 +57,14 @@ function formatPrice(lead) {
   return `${lead.min_price ?? "0"}–${lead.max_price ?? "∞"} ${currency}`.trim();
 }
 
-function listingIntentBadge(listingType, t) {
-  if (listingType === "sale") return { label: t("selling"), color: "text-orange-700 bg-orange-100" };
-  if (listingType === "rent") return { label: t("renting"), color: "text-blue-700 bg-blue-100" };
-  return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
+function listingIntentBadge(lead, t) {
+  if (lead.listing_type === "sale") return { label: t("selling"), color: "text-orange-700 bg-orange-100" };
+  if (lead.listing_type === "rent") return { label: t("renting"), color: "text-blue-700 bg-blue-100" };
+  const message = requestText(lead.notes || "");
+  if (/\b(?:looking|need(?:ing)?|busco|buscamos|buscando|necesito|necesitamos|se busca|se necesita)\b/i.test(message)) {
+    return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
+  }
+  return { label: t("notSpecified"), color: "text-[var(--text-muted)] bg-[var(--surface-muted)]" };
 }
 
 function bedroomRange(item, t) {
@@ -69,16 +75,24 @@ function bedroomRange(item, t) {
   return `${item.min}–${item.max} ${t("bedroomsShort")}`;
 }
 
-function bedroomRequestCount(groups = [], bedroomCount) {
-  return groups.reduce((total, item) => {
-    if (item.min == null && item.max == null) return total;
-    const min = item.min ?? 0;
-    const max = item.max ?? Number.POSITIVE_INFINITY;
-    return bedroomCount >= min && bedroomCount <= max ? total + item.count : total;
-  }, 0);
+function inferEstateCity(lead) {
+  const location = `${lead.city || ""} ${lead.preferred_location || ""}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return lead.city || DOMINICAN_CITIES.find((city) => {
+    const cityKey = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return location.includes(cityKey);
+  }) || "";
 }
 
-function InsightRows({ rows, emptyLabel }) {
+function inferEstateProvince(lead, city) {
+  if (lead.province) return lead.province;
+  const normalizedCity = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (["bavaro", "punta cana", "veron", "higuey"].includes(normalizedCity)) return "La Altagracia";
+  if (normalizedCity === "bani") return "Peravia";
+  if (normalizedCity === "santo domingo") return "Santo Domingo";
+  return "";
+}
+
+export function InsightRows({ rows, emptyLabel }) {
   const max = Math.max(...rows.map((row) => row.value), 1);
   if (!rows.length) {
     return <p className="py-4 text-sm text-[var(--text-muted)]">{emptyLabel}</p>;
@@ -113,6 +127,12 @@ export default function RequestQueuePage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [rescanning, setRescanning] = useState(false);
+  const [brokerCandidates, setBrokerCandidates] = useState([]);
+  const [brokerCandidatesOpen, setBrokerCandidatesOpen] = useState(false);
+  const [selectedBrokerCandidateKeys, setSelectedBrokerCandidateKeys] = useState(new Set());
+  const [savingBrokerCandidates, setSavingBrokerCandidates] = useState(false);
   const [view, setView] = useState("list");
   const [selectedLeadId, setSelectedLeadId] = useState(null);
   const [savingCell, setSavingCell] = useState("");
@@ -151,6 +171,78 @@ export default function RequestQueuePage() {
   const [bulkAction, setBulkAction] = useState("");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [unconvertedOnly, setUnconvertedOnly] = useState(false);
+
+  async function refreshBrokerCandidates() {
+    const response = await fetchBrokerCandidates();
+    setBrokerCandidates(response.results || []);
+  }
+
+  useEffect(() => {
+    let active = true;
+    fetchBrokerCandidates()
+      .then((response) => {
+        if (active) setBrokerCandidates(response.results || []);
+      })
+      .catch((candidateError) => {
+        if (active) setError(candidateError.message || t("error"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [t]);
+
+  function toggleBrokerCandidate(candidateKey) {
+    setSelectedBrokerCandidateKeys((current) => {
+      const next = new Set(current);
+      if (next.has(candidateKey)) next.delete(candidateKey);
+      else next.add(candidateKey);
+      return next;
+    });
+  }
+
+  async function saveSelectedBrokerCandidates(event) {
+    event.preventDefault();
+    const candidateKeys = Array.from(selectedBrokerCandidateKeys);
+    if (!candidateKeys.length) return;
+    setSavingBrokerCandidates(true);
+    setError("");
+    try {
+      const result = await saveBrokerCandidates(candidateKeys);
+      setNotice(t("brokerCandidatesSaved", result));
+      setBrokerCandidatesOpen(false);
+      setSelectedBrokerCandidateKeys(new Set());
+      await Promise.all([refreshBrokerCandidates(), loadRequests()]);
+    } catch (saveError) {
+      setError(saveError.message || t("error"));
+      if (saveError.message?.includes("no longer available")) {
+        await refreshBrokerCandidates();
+      }
+    } finally {
+      setSavingBrokerCandidates(false);
+    }
+  }
+
+  async function rescanBrokerLinks() {
+    setRescanning(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await rescanLeadBrokerLinks();
+      await Promise.all([
+        loadRequests(),
+        fetchLeadSummary(filters).then(setSummary),
+        refreshBrokerCandidates(),
+      ]);
+      setNotice(t("brokerRescanResult", {
+        linked: result.linked,
+        scanned: result.scanned,
+      }));
+    } catch (rescanError) {
+      setError(rescanError.message || t("error"));
+    } finally {
+      setRescanning(false);
+    }
+  }
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -266,10 +358,11 @@ export default function RequestQueuePage() {
     setSavingCell(key);
     setError("");
     try {
+      const updatedValue = ["min_bedrooms", "min_price", "max_price"].includes(field)
+        ? (value === "" ? null : Number(value))
+        : value;
       const updated = await updateLead(lead.id, {
-        [field]: ["min_bedrooms", "min_price", "max_price"].includes(field)
-          ? (value === "" ? null : Number(value))
-          : value,
+        [field]: updatedValue,
       });
       const filterMatches =
         filter === "all" ||
@@ -318,6 +411,7 @@ export default function RequestQueuePage() {
   }
 
   async function prepareEstateDraft(lead) {
+    const city = inferEstateCity(lead);
     setEstateLead(lead);
     setEstateDraft({
       title: `${lead.property_type || t("property")} in ${lead.preferred_location || lead.city || lead.name || t("unknownRequester")}`.trim(),
@@ -329,8 +423,8 @@ export default function RequestQueuePage() {
       bedrooms: lead.min_bedrooms ?? "",
       bathrooms: lead.min_bathrooms ?? "",
       address: lead.preferred_location || "",
-      city: lead.city || "",
-      province: lead.province || "",
+      city,
+      province: inferEstateProvince(lead, city),
       status: "draft",
       broker: lead.broker || "",
       owner: "",
@@ -354,13 +448,20 @@ export default function RequestQueuePage() {
       };
       const estate = await createEstateFromLead(estateLead.id, payload);
       setError("");
-      setEstateNotice(t("estateCreated"));
       setEstateOpen(false);
-      setLeads((current) =>
-        current.map((lead) =>
-          lead.id === estateLead.id ? { ...lead, estate_id: estate.id, estate_slug: estate.slug } : lead
-        )
+      setEstateNotice(
+        <>{t("estateCreated")} <Link href={`/estates/${estate.slug}`} className="font-semibold underline">{estate.title} ({estate.custom_id})</Link></>,
       );
+      if (filter === "open") {
+        setLeads((current) => current.filter((lead) => lead.id !== estateLead.id));
+        setCount((current) => Math.max(0, current - 1));
+      } else {
+        setLeads((current) => current.map((lead) =>
+          lead.id === estateLead.id
+            ? { ...lead, status: "completed", estate_id: estate.id, estate_slug: estate.slug }
+            : lead
+        ));
+      }
     } catch (saveError) {
       setError(saveError.message || t("error"));
     } finally {
@@ -402,8 +503,7 @@ export default function RequestQueuePage() {
         for (const id of ids) {
           const lead = leads.find((l) => l.id === id);
           if (!lead || lead.estate_slug) continue;
-          setEstateLead(lead);
-          setEstateDraft({
+          const draft = {
             title: `${lead.property_type || t("property")} in ${lead.preferred_location || lead.city || lead.name || t("unknownRequester")}`.trim(),
             description: (lead.notes || "").replace(/^WhatsApp request:\s*/, ""),
             property_type: lead.property_type || "apartment",
@@ -415,11 +515,13 @@ export default function RequestQueuePage() {
             address: lead.preferred_location || "",
             city: lead.city || "",
             province: lead.province || "",
+            latitude: lead.latitude || "",
+            longitude: lead.longitude || "",
             status: "draft",
             broker: lead.broker || "",
             owner: "",
-          });
-          await saveEstateBulk(lead);
+          };
+          await saveEstateBulk(lead, draft);
         }
         setBulkModalOpen(false);
         setSelectedLeadIds(new Set());
@@ -450,15 +552,15 @@ export default function RequestQueuePage() {
     }
   }
 
-  async function saveEstateBulk(lead) {
-    if (!lead) return;
+  async function saveEstateBulk(lead, draft) {
+    if (!lead || !draft) return;
     const payload = {
-      ...estateDraft,
-      broker: estateDraft.broker ? Number(estateDraft.broker) : null,
-      owner: estateDraft.owner ? Number(estateDraft.owner) : null,
-      price: estateDraft.price === "" ? null : Number(estateDraft.price),
-      bedrooms: estateDraft.bedrooms === "" ? null : Number(estateDraft.bedrooms),
-      bathrooms: estateDraft.bathrooms === "" ? null : Number(estateDraft.bathrooms),
+      ...draft,
+      broker: draft.broker ? Number(draft.broker) : null,
+      owner: draft.owner ? Number(draft.owner) : null,
+      price: draft.price === "" ? null : Number(draft.price),
+      bedrooms: draft.bedrooms === "" ? null : Number(draft.bedrooms),
+      bathrooms: draft.bathrooms === "" ? null : Number(draft.bathrooms),
     };
     const estate = await createEstateFromLead(lead.id, payload);
     setLeads((current) =>
@@ -506,14 +608,25 @@ export default function RequestQueuePage() {
   return (
     <>
       <PageShell
+        className="request-page-shell"
         eyebrow={t("whatsappImport")}
         title={t("requestQueue")}
         description={t("requestQueueDescription")}
         actions={(
-          <>
+          <div className="request-page-actions">
             <Link href="/leads" className="toolbar-button toolbar-button-primary">
               {t("addLead")}
             </Link>
+            <button
+              type="button"
+              onClick={rescanBrokerLinks}
+              disabled={rescanning}
+              className="toolbar-button"
+              title={t("rescanBrokerLinks")}
+            >
+              <RefreshCw size={15} className={rescanning ? "animate-spin" : ""} />
+              {t("rescanBrokerLinks")}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -525,14 +638,39 @@ export default function RequestQueuePage() {
               aria-label={t("addContact")}
             >
               <UserPlus size={15} />
+              <span className="sr-only">{t("addContact")}</span>
             </button>
             <Link href="/whatsapp-import" className="toolbar-button">
               {t("importWhatsAppChat")}
             </Link>
-          </>
+            <ToolbarMenu label={t("requestTools")} className="request-actions-overflow">
+              <Link href="/leads" className="toolbar-menu-item">{t("addLead")}</Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setContactNotice("");
+                  setContactOpen(true);
+                }}
+                className="toolbar-menu-item"
+              >
+                <UserPlus size={15} />
+                <span>{t("addContact")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={rescanBrokerLinks}
+                disabled={rescanning}
+                className="toolbar-menu-item"
+              >
+                <RefreshCw size={15} className={rescanning ? "animate-spin" : ""} />
+                <span>{t("rescanBrokerLinks")}</span>
+              </button>
+              <Link href="/whatsapp-import" className="toolbar-menu-item">{t("importWhatsAppChat")}</Link>
+            </ToolbarMenu>
+          </div>
         )}
         toolbar={(
-          <>
+          <div className="request-toolbar">
             <div className="toolbar-tabs" role="tablist" aria-label={t("requestQueue")}>
               {FILTERS.map((status) => (
                 <button
@@ -563,7 +701,6 @@ export default function RequestQueuePage() {
                 ["list", List, t("requestsListView")],
                 ["grid", LayoutGrid, t("requestsGridView")],
                 ["spreadsheet", FileSpreadsheet, t("requestsSpreadsheetView")],
-                ["insights", BarChart3, t("requestInsightsView")],
               ].map(([item, Icon, label]) => (
                 <button
                   key={item}
@@ -659,29 +796,26 @@ export default function RequestQueuePage() {
 
             <span className="page-toolbar-spacer" />
             <span className="page-toolbar-label">{count} {t("requests")}</span>
-            <button
-              type="button"
-              onClick={() => setUnconvertedOnly((prev) => !prev)}
-              className={`toolbar-button ${unconvertedOnly ? "toolbar-button-primary" : ""}`}
-              title={t("unconvertedOnly")}
-              aria-label={t("unconvertedOnly")}
-            >
-              <RotateCcw size={14} className="mr-1" />
-              {t("unconvertedOnly")}
-            </button>
-            {selectedLeadIds.size > 0 && (
+            <ToolbarMenu label={t("moreActions")}>
               <button
                 type="button"
-                onClick={() => setBulkModalOpen(true)}
-                className="toolbar-button toolbar-button-primary"
-                title={t("bulkActions")}
-                aria-label={t("bulkActions")}
+                onClick={() => setUnconvertedOnly((prev) => !prev)}
+                className="toolbar-menu-item"
+                aria-pressed={unconvertedOnly}
               >
-                <AlertTriangle size={15} />
-                {selectedLeadIds.size}
+                <RotateCcw size={15} />
+                <span>{unconvertedOnly ? t("showAllRequests") : t("unconvertedOnly")}</span>
               </button>
-            )}
-            <ToolbarMenu label={t("moreActions")}>
+              {selectedLeadIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setBulkModalOpen(true)}
+                  className="toolbar-menu-item"
+                >
+                  <AlertTriangle size={15} />
+                  <span>{t("bulkActions")} ({selectedLeadIds.size})</span>
+                </button>
+              )}
               <button
                 type="button"
                 disabled={exporting}
@@ -691,6 +825,7 @@ export default function RequestQueuePage() {
                 aria-label={t("exportCSV")}
               >
                 <Download size={15} />
+                <span>CSV</span>
               </button>
               <button
                 type="button"
@@ -701,15 +836,40 @@ export default function RequestQueuePage() {
                 aria-label={t("exportXlsx")}
               >
                 <FileSpreadsheet size={15} />
+                <span>XLSX</span>
               </button>
             </ToolbarMenu>
-          </>
+          </div>
         )}
         footer={pagination}
       >
         {error && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-700">
+            {notice}
+          </div>
+        )}
+
+        {brokerCandidates.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--green)]/30 bg-[var(--surface)] p-3">
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              {t("newBrokerCandidatesPrompt", { count: brokerCandidates.length })}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedBrokerCandidateKeys(new Set(brokerCandidates.map((candidate) => candidate.candidate_key)));
+                setBrokerCandidatesOpen(true);
+              }}
+              className="toolbar-button toolbar-button-primary"
+            >
+              {t("reviewBrokerCandidates")}
+            </button>
           </div>
         )}
 
@@ -724,6 +884,60 @@ export default function RequestQueuePage() {
             {estateNotice}
           </div>
         )}
+
+      {brokerCandidatesOpen && (
+        <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+          <form
+            onSubmit={saveSelectedBrokerCandidates}
+            className="my-4 grid w-full max-w-xl gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">{t("brokerCandidatesTitle")}</h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{t("brokerCandidatesDescription")}</p>
+              </div>
+              <button type="button" onClick={() => setBrokerCandidatesOpen(false)} className="toolbar-button">
+                <X size={16} />
+                {t("close")}
+              </button>
+            </div>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+              {brokerCandidates.map((candidate) => (
+                <label
+                  key={candidate.candidate_key}
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--border)] p-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBrokerCandidateKeys.has(candidate.candidate_key)}
+                    onChange={() => toggleBrokerCandidate(candidate.candidate_key)}
+                    className="mt-1"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{candidate.name}</span>
+                    {candidate.phone && <span className="block text-sm text-[var(--text-muted)]">{candidate.phone}</span>}
+                  </span>
+                  <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                    {t("brokerCandidateRequests", { count: candidate.request_count })}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setBrokerCandidatesOpen(false)} className="toolbar-button">
+                {t("cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={savingBrokerCandidates || selectedBrokerCandidateKeys.size === 0}
+                className="toolbar-button toolbar-button-primary"
+              >
+                {savingBrokerCandidates ? t("saving") : `${t("saveSelectedBrokers")} (${selectedBrokerCandidateKeys.size})`}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {contactOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
@@ -893,17 +1107,49 @@ export default function RequestQueuePage() {
 
             <label className="filter-field">
               <span>{t("city")}</span>
-              <input
+              <select
                 value={estateDraft.city}
                 onChange={(event) => setEstateDraft({ ...estateDraft, city: event.target.value })}
-              />
+              >
+                <option value="">—</option>
+                {estateDraft.city && !DOMINICAN_CITIES.includes(estateDraft.city) && (
+                  <option value={estateDraft.city}>{estateDraft.city}</option>
+                )}
+                {DOMINICAN_CITIES.map((city) => <option key={city} value={city}>{city}</option>)}
+              </select>
             </label>
 
             <label className="filter-field">
               <span>{t("province")}</span>
-              <input
+              <select
                 value={estateDraft.province}
                 onChange={(event) => setEstateDraft({ ...estateDraft, province: event.target.value })}
+              >
+                <option value="">—</option>
+                {estateDraft.province && !DOMINICAN_PROVINCES.includes(estateDraft.province) && (
+                  <option value={estateDraft.province}>{estateDraft.province}</option>
+                )}
+                {DOMINICAN_PROVINCES.map((province) => <option key={province} value={province}>{province}</option>)}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              <span>{t("latitude")}</span>
+              <input
+                type="number"
+                step="any"
+                value={estateDraft.latitude || ""}
+                onChange={(event) => setEstateDraft({ ...estateDraft, latitude: event.target.value })}
+              />
+            </label>
+
+            <label className="filter-field">
+              <span>{t("longitude")}</span>
+              <input
+                type="number"
+                step="any"
+                value={estateDraft.longitude || ""}
+                onChange={(event) => setEstateDraft({ ...estateDraft, longitude: event.target.value })}
               />
             </label>
 
@@ -940,71 +1186,7 @@ export default function RequestQueuePage() {
         </div>
       )}
 
-      {view === "insights" ? (
-        <section className="space-y-3">
-          <StatStrip
-            items={[
-              { label: t("totalRequests"), value: summary?.total ?? "—" },
-              { label: t("twoBedroomRequests"), value: bedroomRequestCount(summary?.by_bedrooms, 2) },
-              {
-                label: t("mostRequestedType"),
-                value: summary?.top_property_type?.property_type
-                  ? t(summary.top_property_type.property_type)
-                  : t("notSpecified"),
-                sub: summary?.top_property_type?.count ?? 0,
-              },
-              {
-                label: t("mostEstatesBroker"),
-                value: summary?.top_brokers?.[0]?.name || t("notSpecified"),
-                sub: `${summary?.top_brokers?.[0]?.property_count ?? 0} ${t("estates")}`,
-              },
-            ]}
-          />
-          <div className="grid gap-3 lg:grid-cols-3">
-            <div className="compact-card">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <BarChart3 size={16} className="text-[var(--green)]" />
-                {t("requestsByType")}
-              </h2>
-              <InsightRows
-                rows={(summary?.by_property_type || []).map((item) => ({
-                  label: item.property_type ? t(item.property_type) : t("notSpecified"),
-                  value: item.count,
-                }))}
-                emptyLabel={t("noRequestData")}
-              />
-            </div>
-            <div className="compact-card">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <BarChart3 size={16} className="text-[var(--green)]" />
-                {t("requestsByBedrooms")}
-              </h2>
-              <InsightRows
-                rows={(summary?.by_bedrooms || []).map((item) => ({
-                  label: bedroomRange(item, t),
-                  value: item.count,
-                }))}
-                emptyLabel={t("noRequestData")}
-              />
-            </div>
-            <div className="compact-card">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-                <BarChart3 size={16} className="text-[var(--green)]" />
-                {t("brokerActivity")}
-              </h2>
-              <InsightRows
-                rows={(summary?.top_brokers || []).map((broker) => ({
-                  id: broker.id ?? `broker-${broker.name}`,
-                  label: `${broker.name}${broker.company ? ` · ${broker.company}` : ""}`,
-                  value: broker.property_count,
-                  subtitle: `${broker.request_count} ${t("requests")}`,
-                }))}
-                emptyLabel={t("noBrokerData")}
-              />
-            </div>
-          </div>
-        </section>
-      ) : loading ? (
+      {loading ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-[var(--text-muted)]">
           {t("loading")}
         </div>
@@ -1091,8 +1273,8 @@ export default function RequestQueuePage() {
                     <select aria-label={t("listingType")} value={lead.listing_type || "any"} onChange={(event) => saveSpreadsheetCell(lead, "listing_type", event.target.value)} className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1">
                       {["any", "rent", "sale"].map((type) => <option key={type} value={type}>{type === "any" ? t("anyListingType") : t(`listing_${type}`)}</option>)}
                     </select>
-                    <span className={`mt-0.5 block inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${listingIntentBadge(lead.listing_type, t).color}`}>
-                      {listingIntentBadge(lead.listing_type, t).label}
+                    <span className={`mt-0.5 block inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${listingIntentBadge(lead, t).color}`}>
+                      {listingIntentBadge(lead, t).label}
                     </span>
                   </td>
                   <td className="px-3 py-2"><input aria-label={t("bedrooms")} type="number" min="0" defaultValue={lead.min_bedrooms ?? ""} onBlur={(event) => saveSpreadsheetCell(lead, "min_bedrooms", event.target.value)} className="w-20 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1" /></td>
@@ -1149,8 +1331,8 @@ export default function RequestQueuePage() {
               </div>
               <p className="mt-1 text-sm text-[var(--text-muted)]">{lead.phone || t("phoneNotFound")}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead.listing_type, t).color}`}>
-                  {listingIntentBadge(lead.listing_type, t).label}
+                <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead, t).color}`}>
+                  {listingIntentBadge(lead, t).label}
                 </span>
                 {[lead.property_type && t(lead.property_type), lead.listing_type && lead.listing_type !== "any" && t(`listing_${lead.listing_type}`), lead.min_bedrooms != null && `${lead.min_bedrooms}+ ${t("bedroomsShort")}`, lead.city || lead.preferred_location, lead.province, formatPrice(lead)]
                   .filter(Boolean).map((value) => <span key={value} className="rounded-md bg-[var(--surface-muted)] px-2 py-1">{value}</span>)}
@@ -1175,8 +1357,8 @@ export default function RequestQueuePage() {
                   checked={isSelected(lead.id)}
                   onChange={() => toggleSelect(lead.id)}
                 />
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
+                <div className="request-card-header flex flex-wrap items-start justify-between gap-4">
+                  <div className="request-card-main min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/requests/${lead.id}`}
@@ -1207,76 +1389,11 @@ export default function RequestQueuePage() {
                       {lead.whatsapp_group || "WhatsApp"} · {new Date(lead.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {filter === "ignored" ? (
-                      <button
-                        type="button"
-                        disabled={busyId === lead.id}
-                        onClick={() => setUserIgnored(lead, false)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--green)] disabled:opacity-50"
-                      >
-                        <RotateCcw size={15} />
-                        {t("unignoreUser")}
-                      </button>
-                    ) : isOpen ? (
-                      <>
-                        <button
-                          type="button"
-                          disabled={busyId === lead.id}
-                          onClick={() => setLeadStatus(lead, "completed")}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--green)] px-3 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                        >
-                          <Check size={16} />
-                          {t("markCompleted")}
-                        </button>
-                        {lead.source === "whatsapp" && (
-                          <button
-                            type="button"
-                            disabled={busyId === lead.id}
-                            onClick={() => setUserIgnored(lead, true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-amber-500 disabled:opacity-50"
-                          >
-                            <UserRoundX size={15} />
-                            {t("ignoreUser")}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={busyId === lead.id}
-                          onClick={() => setLeadStatus(lead, "unavailable")}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-red-400 disabled:opacity-50"
-                        >
-                          <X size={16} />
-                          {t("markUnavailable")}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busyId === lead.id}
-                        onClick={() => setLeadStatus(lead, "new")}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--green)] disabled:opacity-50"
-                      >
-                        <RotateCcw size={15} />
-                        {t("reopenRequest")}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busyId === lead.id || !!lead.estate_slug}
-                      onClick={() => prepareEstateDraft(lead)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--green)] disabled:opacity-50"
-                      title={lead.estate_slug ? t("estateAlreadyCreated") : t("estateFromRequest")}
-                    >
-                      <Save size={15} />
-                      {t("estateFromRequest")}
-                    </button>
-                  </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead.listing_type, t).color}`}>
-                    {listingIntentBadge(lead.listing_type, t).label}
+                  <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead, t).color}`}>
+                    {listingIntentBadge(lead, t).label}
                   </span>
                   {[
                     lead.listing_type !== "any" && t(`listing_${lead.listing_type}`),
@@ -1306,17 +1423,87 @@ export default function RequestQueuePage() {
                     )}
                 </div>
 
-                {lead.notes && (
-                  <details className="mt-4 border-t border-[var(--border)] pt-3">
-                    <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--green)]">
-                      <Clock3 size={15} />
-                      {t("originalRequest")}
-                    </summary>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--text-muted)]">
-                      {requestText(lead.notes)}
-                    </p>
-                  </details>
-                )}
+                <div className="request-card-footer">
+                  {lead.notes && (
+                    <details className="request-original-request">
+                      <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--green)]">
+                        <Clock3 size={15} />
+                        {t("originalRequest")}
+                      </summary>
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--text-muted)]">
+                        {requestText(lead.notes)}
+                      </p>
+                    </details>
+                  )}
+                  <div className="request-card-actions flex flex-wrap gap-2">
+                    {filter === "ignored" ? (
+                      <button
+                        type="button"
+                        disabled={busyId === lead.id}
+                        onClick={() => setUserIgnored(lead, false)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--green)] disabled:opacity-50"
+                      >
+                        <RotateCcw size={15} />
+                        {t("unignoreUser")}
+                      </button>
+                    ) : isOpen ? (
+                      <button
+                        type="button"
+                        aria-label={t("markCompleted")}
+                        title={t("markCompleted")}
+                        disabled={busyId === lead.id}
+                        onClick={() => setLeadStatus(lead, "completed")}
+                        className="request-complete-button inline-flex items-center justify-center rounded-lg bg-[var(--green)] text-white hover:opacity-90 disabled:opacity-50"
+                      >
+                        <Check size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busyId === lead.id}
+                        onClick={() => setLeadStatus(lead, "new")}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--green)] disabled:opacity-50"
+                      >
+                        <RotateCcw size={15} />
+                        {t("reopenRequest")}
+                      </button>
+                    )}
+                    <ToolbarMenu label={t("moreActions")}>
+                      {isOpen && lead.source === "whatsapp" && (
+                        <button
+                          type="button"
+                          disabled={busyId === lead.id}
+                          onClick={() => setUserIgnored(lead, true)}
+                          className="toolbar-menu-item"
+                        >
+                          <UserRoundX size={15} />
+                          <span>{t("ignoreUser")}</span>
+                        </button>
+                      )}
+                      {isOpen && (
+                        <button
+                          type="button"
+                          disabled={busyId === lead.id}
+                          onClick={() => setLeadStatus(lead, "unavailable")}
+                          className="toolbar-menu-item"
+                        >
+                          <X size={15} />
+                          <span>{t("markUnavailable")}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busyId === lead.id || !!lead.estate_slug}
+                        onClick={() => prepareEstateDraft(lead)}
+                        className="toolbar-menu-item"
+                        title={lead.estate_slug ? t("estateAlreadyCreated") : t("estateFromRequest")}
+                      >
+                        <Save size={15} />
+                        <span>{lead.estate_slug ? t("estateAlreadyCreated") : t("estateFromRequest")}</span>
+                      </button>
+                    </ToolbarMenu>
+                  </div>
+                </div>
               </article>
             );
           })}

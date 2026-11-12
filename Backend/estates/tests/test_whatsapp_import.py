@@ -15,6 +15,7 @@ from estates.matching import compute_match_score
 from estates.models import (
     Broker,
     Lead,
+    LeadMatch,
     Owner,
     Property,
     Project,
@@ -128,6 +129,20 @@ class WhatsAppParserTests(TestCase):
         self.assertEqual(lead["preferred_location"], "Costa Cana, Brisas")
         self.assertEqual(lead["furnishing"], "furnished")
         self.assertEqual(lead["source_message"], message["message"])
+
+    def test_rento_and_alquilo_requests_are_classified_as_rent(self):
+        for message_text in (
+            "Rento apartamento de 2 habitaciones en Punta Cana",
+            "Alquilo casa de 3 habitaciones en Bávaro",
+            "Looking to rent a 2 bedroom apartment",
+            "Need to rent a villa",
+        ):
+            with self.subTest(message=message_text):
+                lead = extract_lead_data({
+                    "sender": "Broker",
+                    "message": message_text,
+                })
+                self.assertEqual(lead["listing_type"], "rent")
 
     def test_sender_identity_is_normalized_without_using_message_text(self):
         self.assertEqual(
@@ -529,6 +544,18 @@ class WhatsAppImportEndpointTests(TestCase):
         self.assertEqual(estate.source_lead, lead)
         self.assertEqual(estate.broker, broker)
         self.assertEqual(estate.status, "draft")
+        self.assertRegex(estate.custom_id, r"^RQ-[A-Z0-9]{5}$")
+        self.assertTrue(LeadMatch.objects.filter(lead=lead, property=estate).exists())
+        lead.refresh_from_db()
+        self.assertEqual(lead.status, "completed")
+
+        detail_response = self.client.get(f"/api/estates/properties/{estate.slug}/")
+        self.assertEqual(detail_response.status_code, 200, detail_response.data)
+        self.assertEqual(detail_response.data["status"], "draft")
+        self.assertEqual(detail_response.data["custom_id"], estate.custom_id)
+        self.assertEqual(detail_response.data["broker_name"], "Broker One")
+        self.assertEqual(detail_response.data["source_lead_details"]["broker_name"], "Broker One")
+        self.assertEqual(detail_response.data["source_lead_details"]["name"], "Requester broker")
 
         duplicate_response = self.client.post(
             f"/api/estates/leads/{lead.id}/create_estate/",
@@ -755,6 +782,111 @@ class EstateManagementApiTests(TestCase):
         )
         self.client.force_authenticate(user=user)
 
+    def test_rescan_links_only_unassigned_requests_with_unique_broker_phone(self):
+        matching_broker = Broker.objects.create(
+            name="Matching broker",
+            phone="(809) 555-0101",
+        )
+        ambiguous_broker_one = Broker.objects.create(
+            name="Ambiguous broker one",
+            phone="809-555-0102",
+        )
+        Broker.objects.create(
+            name="Ambiguous broker two",
+            phone="8095550102",
+        )
+        name_matching_broker = Broker.objects.create(name="Name Matched Broker")
+        manually_linked_broker = Broker.objects.create(
+            name="Manually linked broker",
+            phone="8095550103",
+        )
+        matching_lead = Lead.objects.create(
+            name="Matching request",
+            phone="809.555.0101",
+        )
+        name_matching_lead = Lead.objects.create(name="Name Matched Broker")
+        ambiguous_lead = Lead.objects.create(
+            name="Ambiguous request",
+            phone="809 555 0102",
+        )
+        manually_linked_lead = Lead.objects.create(
+            name="Already linked request",
+            phone="8095550103",
+            broker=matching_broker,
+        )
+
+        response = self.client.post("/api/estates/leads/rescan_broker_links/")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data, {"scanned": 3, "linked": 2, "unmatched": 1})
+        matching_lead.refresh_from_db()
+        name_matching_lead.refresh_from_db()
+        ambiguous_lead.refresh_from_db()
+        manually_linked_lead.refresh_from_db()
+        self.assertEqual(matching_lead.broker_id, matching_broker.id)
+        self.assertEqual(name_matching_lead.broker_id, name_matching_broker.id)
+        self.assertIsNone(ambiguous_lead.broker_id)
+        self.assertEqual(manually_linked_lead.broker_id, matching_broker.id)
+
+    def test_broker_candidates_can_be_reviewed_and_saved_with_linked_requests(self):
+        existing_broker = Broker.objects.create(name="Already in directory", phone="8095550101")
+        Broker.objects.create(name="Known Phone Broker", phone="8095550102")
+        first_candidate_request = Lead.objects.create(
+            name="WhatsApp Contact",
+            source_sender="New Broker",
+            phone="+1 (809) 555-0103",
+        )
+        duplicate_candidate_request = Lead.objects.create(
+            name="WhatsApp Contact",
+            source_sender="New Broker",
+            phone="8095550103",
+        )
+        known_broker_request = Lead.objects.create(
+            name="Known Phone Broker",
+            source_sender="Known Phone Broker",
+            phone="809 555 0102",
+        )
+        ignored_request = Lead.objects.create(
+            name="Ignored Contact",
+            source_sender="Ignored Contact",
+            phone="8095550104",
+            status="ignored",
+        )
+        already_linked_request = Lead.objects.create(
+            name="Already linked",
+            source_sender="Already in directory",
+            phone="8095550101",
+            broker=existing_broker,
+        )
+
+        candidates_response = self.client.get("/api/estates/leads/broker_candidates/")
+
+        self.assertEqual(candidates_response.status_code, 200, candidates_response.data)
+        self.assertEqual(candidates_response.data["count"], 1)
+        candidate = candidates_response.data["results"][0]
+        self.assertEqual(candidate["name"], "New Broker")
+        self.assertEqual(candidate["request_count"], 2)
+
+        save_response = self.client.post(
+            "/api/estates/leads/broker_candidates/",
+            {"candidate_keys": [candidate["candidate_key"]]},
+            format="json",
+        )
+
+        self.assertEqual(save_response.status_code, 200, save_response.data)
+        self.assertEqual(save_response.data, {"created": 1, "linked": 2})
+        broker = Broker.objects.get(name="New Broker")
+        first_candidate_request.refresh_from_db()
+        duplicate_candidate_request.refresh_from_db()
+        known_broker_request.refresh_from_db()
+        ignored_request.refresh_from_db()
+        already_linked_request.refresh_from_db()
+        self.assertEqual(first_candidate_request.broker_id, broker.id)
+        self.assertEqual(duplicate_candidate_request.broker_id, broker.id)
+        self.assertIsNone(known_broker_request.broker_id)
+        self.assertIsNone(ignored_request.broker_id)
+        self.assertEqual(already_linked_request.broker_id, existing_broker.id)
+
     def test_owner_directory_and_property_project_relationships(self):
         owner_response = self.client.post(
             "/api/estates/owners/",
@@ -784,6 +916,7 @@ class EstateManagementApiTests(TestCase):
             format="json",
         )
         self.assertEqual(project_response.status_code, 201, project_response.data)
+        self.assertRegex(project_response.data["custom_id"], r"^PR-[A-Z0-9]{5}$")
         project = Project.objects.get(pk=project_response.data["id"])
         self.assertEqual(project.owner_id, owner_id)
         self.assertEqual(project.broker_id, broker_id)
@@ -799,6 +932,7 @@ class EstateManagementApiTests(TestCase):
             format="json",
         )
         self.assertEqual(property_response.status_code, 201, property_response.data)
+        self.assertRegex(property_response.data["custom_id"], r"^NM-[A-Z0-9]{5}$")
         self.assertEqual(
             Property.objects.get(pk=property_response.data["id"]).owner_id,
             owner_id,
@@ -894,4 +1028,3 @@ class EstateWritePermissionTests(TestCase):
             format="json",
         )
         self.assertEqual(bulk_response.status_code, 403, bulk_response.data)
-

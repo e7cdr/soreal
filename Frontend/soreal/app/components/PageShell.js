@@ -7,9 +7,10 @@ export default function PageShell({
   footer,
   children,
   bodyClassName = "",
+  className = "",
 }) {
   return (
-    <div className="page-shell">
+    <div className={`page-shell ${className}`.trim()}>
       <header className="page-head">
         <div className="page-head-main">
           {eyebrow && <p className="page-eyebrow">{eyebrow}</p>}

@@ -37,11 +37,14 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 
 class PropertySerializer(serializers.ModelSerializer):
     images = PropertyImageSerializer(many=True, read_only=True)
+    broker_name = serializers.CharField(source="broker.name", read_only=True, allow_null=True)
+    source_lead_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Property
         fields = [
             "id",
+            "custom_id",
             "title",
             "slug",
             "description",
@@ -61,13 +64,27 @@ class PropertySerializer(serializers.ModelSerializer):
             "featured",
             "amenities",
             "broker",
+            "broker_name",
             "owner",
             "source_lead",
+            "source_lead_details",
             "images",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["slug", "source_lead", "created_at", "updated_at"]
+
+    def get_source_lead_details(self, obj):
+        lead = obj.source_lead
+        if lead is None:
+            return None
+        return {
+            "id": lead.id,
+            "name": lead.name,
+            "phone": lead.phone,
+            "whatsapp_group": lead.whatsapp_group,
+            "broker_name": lead.broker.name if lead.broker_id else None,
+        }
 
 
 class PropertyInquirySerializer(serializers.ModelSerializer):
@@ -427,6 +444,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id",
+            "custom_id",
             "name",
             "slug",
             "description",

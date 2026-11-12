@@ -4,6 +4,7 @@ import io
 import re
 from django.http import HttpResponse
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Case, CharField, Count, F, Q, Value, When
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -78,6 +79,63 @@ def _safe_spreadsheet_value(value):
     return value
 
 
+def _phone_digits(value):
+    digits = re.sub(r"\D", "", value or "")
+    return digits[1:] if len(digits) == 11 and digits.startswith("1") else digits
+
+
+def _broker_name_key(value):
+    return re.sub(r"[^\w]+", " ", (value or "").casefold()).strip()
+
+
+def _unlinked_broker_candidates():
+    existing_phones = {
+        _phone_digits(phone)
+        for phone in Broker.objects.exclude(phone="").exclude(phone__isnull=True)
+        .values_list("phone", flat=True)
+    }
+    existing_names = {
+        _broker_name_key(name)
+        for name in Broker.objects.values_list("name", flat=True)
+        if _broker_name_key(name)
+    }
+    candidates = {}
+    leads = (
+        Lead.objects.filter(broker__isnull=True)
+        .exclude(status="ignored")
+        .only("id", "name", "phone", "source_sender")
+        .order_by("id")
+    )
+    for lead in leads.iterator(chunk_size=1000):
+        phone = (lead.phone or "").strip()
+        phone_key = _phone_digits(phone)
+        name = (lead.source_sender or lead.name or "").strip()
+        name_key = _broker_name_key(name)
+        if not name and phone:
+            name = phone
+        if not name or (phone_key and phone_key in existing_phones) or (
+            name_key and name_key in existing_names
+        ):
+            continue
+        candidate_key = f"phone:{phone_key}" if phone_key else f"name:{name_key}"
+        candidate = candidates.setdefault(
+            candidate_key,
+            {
+                "candidate_key": candidate_key,
+                "name": name[:200],
+                "phone": phone,
+                "lead_ids": [],
+                "request_count": 0,
+            },
+        )
+        if not candidate["phone"] and phone:
+            candidate["phone"] = phone
+        candidate["lead_ids"].append(lead.id)
+        candidate["request_count"] += 1
+
+    return sorted(candidates.values(), key=lambda item: item["name"].casefold())
+
+
 class PropertyViewSet(viewsets.ModelViewSet):
     """
     API for property listings.
@@ -89,7 +147,9 @@ class PropertyViewSet(viewsets.ModelViewSet):
     against existing leads.
     """
 
-    queryset = Property.objects.prefetch_related("images__image")
+    queryset = Property.objects.select_related(
+        "broker", "owner", "source_lead", "source_lead__broker"
+    ).prefetch_related("images__image")
     serializer_class = PropertySerializer
     permission_classes = [IsStaffOrReadOnly]
     lookup_field = "slug"
@@ -536,6 +596,116 @@ class LeadViewSet(viewsets.ModelViewSet):
             "top_brokers": BrokerSerializer(broker_stats, many=True).data,
         })
 
+    @action(detail=False, methods=["post"])
+    def rescan_broker_links(self, request):
+        if not _is_staff(request):
+            return Response({"detail": "Staff access required."}, status=403)
+
+        def name_key(value):
+            return re.sub(r"[^\w]+", " ", value.casefold()).strip()
+
+        broker_by_phone = {}
+        ambiguous_phones = set()
+        broker_by_name = {}
+        ambiguous_names = set()
+        brokers = Broker.objects.exclude(phone="").exclude(phone__isnull=True).only("id", "phone")
+        for broker in brokers.iterator():
+            digits = _phone_digits(broker.phone)
+            if not digits:
+                continue
+            if digits in broker_by_phone:
+                ambiguous_phones.add(digits)
+            else:
+                broker_by_phone[digits] = broker
+
+        for broker in Broker.objects.only("id", "name").iterator():
+            key = name_key(broker.name)
+            if not key:
+                continue
+            if key in broker_by_name:
+                ambiguous_names.add(key)
+            else:
+                broker_by_name[key] = broker
+
+        for digits in ambiguous_phones:
+            broker_by_phone.pop(digits, None)
+        for key in ambiguous_names:
+            broker_by_name.pop(key, None)
+
+        unlinked_leads = Lead.objects.filter(broker__isnull=True).only(
+            "id", "phone", "name", "source_sender", "broker_id"
+        )
+        scanned = unlinked_leads.count()
+        linked_leads = []
+        for lead in unlinked_leads.iterator(chunk_size=1000):
+            broker = broker_by_phone.get(_phone_digits(lead.phone))
+            if broker is None:
+                name_matches = {
+                    broker_by_name[key].id: broker_by_name[key]
+                    for key in (name_key(lead.source_sender), name_key(lead.name))
+                    if key in broker_by_name
+                }
+                if len(name_matches) == 1:
+                    broker = next(iter(name_matches.values()))
+            if broker:
+                lead.broker = broker
+                linked_leads.append(lead)
+
+        if linked_leads:
+            Lead.objects.bulk_update(linked_leads, ["broker"], batch_size=500)
+
+        return Response({
+            "scanned": scanned,
+            "linked": len(linked_leads),
+            "unmatched": scanned - len(linked_leads),
+        })
+
+    @action(detail=False, methods=["get", "post"])
+    def broker_candidates(self, request):
+        if not _is_staff(request):
+            return Response({"detail": "Staff access required."}, status=403)
+
+        candidates = _unlinked_broker_candidates()
+        if request.method == "GET":
+            return Response({"count": len(candidates), "results": candidates})
+
+        candidate_keys = request.data.get("candidate_keys")
+        if not isinstance(candidate_keys, list) or not all(
+            isinstance(key, str) for key in candidate_keys
+        ):
+            return Response(
+                {"candidate_keys": "Provide a list of candidate keys."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        current_candidates = {item["candidate_key"]: item for item in candidates}
+        missing_keys = set(candidate_keys) - current_candidates.keys()
+        if missing_keys:
+            return Response(
+                {"detail": "Some selected contacts are no longer available. Refresh and try again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        created = 0
+        linked = 0
+        with transaction.atomic():
+            for candidate_key in dict.fromkeys(candidate_keys):
+                candidate = current_candidates[candidate_key]
+                broker = Broker.objects.create(
+                    name=candidate["name"],
+                    phone=candidate["phone"],
+                )
+                updated = Lead.objects.filter(
+                    id__in=candidate["lead_ids"],
+                    broker__isnull=True,
+                ).update(broker=broker)
+                if updated:
+                    created += 1
+                    linked += updated
+                else:
+                    broker.delete()
+
+        return Response({"created": created, "linked": linked})
+
     @action(detail=False, methods=["get"])
     def duplicates(self, request):
         if not _is_staff(request):
@@ -719,6 +889,9 @@ class LeadViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         estate = serializer.save(source_lead=lead)
         create_matches_for_property(estate)
+        if lead.status != "completed":
+            lead.status = "completed"
+            lead.save(update_fields=["status", "updated_at"])
         return Response(PropertySerializer(estate, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):

@@ -11,10 +11,11 @@ import {
   fetchAnalyticsUnitStatus,
 } from "@/lib/api";
 import Link from "next/link";
-import { Users, Plus } from "lucide-react";
+import { Users, Plus, BarChart3 } from "lucide-react";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
 import StatStrip from "@/app/components/StatStrip";
+import { InsightRows } from "@/app/requests/page";
 
 function SparklineChart({ data, height = 80, label }) {
   const { translate: t } = useTranslation();
@@ -284,6 +285,54 @@ export default function AnalyticsPage() {
           </div>
         </div>
       )}
+
+      <div className="mt-6">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <BarChart3 size={16} className="text-[var(--green)]" />
+          {t("requestInsights")}
+        </h2>
+        <StatStrip
+          items={[
+            { label: t("totalRequests"), value: summary?.total_leads || 0 },
+            { label: t("totalProperties"), value: summary?.total_properties || 0 },
+            { label: t("totalInquiries"), value: summary?.total_inquiries || 0 },
+          ]}
+        />
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="compact-card">
+            <h3 className="mb-2 text-sm font-semibold">{t("requestsByType")}</h3>
+            <InsightRows
+              rows={(summary?.by_property_type || []).map((item) => ({
+                label: item.property_type ? t(item.property_type) : t("notSpecified"),
+                value: item.count,
+              }))}
+              emptyLabel={t("noRequestData")}
+            />
+          </div>
+          <div className="compact-card">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">{t("requestsByBedrooms")}</h3>
+            <InsightRows
+              rows={(summary?.by_bedrooms || []).map((item) => ({
+                label: item.bedrooms ? `${item.bedrooms} ${t("bedroomsShort")}` : t("notSpecified"),
+                value: item.count,
+              }))}
+              emptyLabel={t("noRequestData")}
+            />
+          </div>
+          <div className="compact-card">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">{t("topBrokers")}</h3>
+            <InsightRows
+              rows={(summary?.top_brokers || []).map((broker) => ({
+                id: broker.id ?? `broker-${broker.name}`,
+                label: `${broker.name}${broker.company ? ` · ${broker.company}` : ""}`,
+                value: broker.property_count || broker.request_count || 0,
+                subtitle: `${broker.request_count} ${t("requests")}`,
+              }))}
+              emptyLabel={t("noBrokerData")}
+            />
+          </div>
+        </div>
+      </div>
     </PageShell>
   );
 }

@@ -67,6 +67,11 @@ export default function PropertyCard({ property }) {
       <p className="text-gray-600 text-sm">
         {property.city} · {typeLabel} · {listingLabel}
       </p>
+      {property.custom_id && (
+        <p className="mt-1 text-xs font-semibold tracking-wide text-[var(--text-muted)]">
+          {t("customId")}: {property.custom_id}
+        </p>
+      )}
       {property.price && (
         <p className="font-bold mt-1">
           {property.currency} {property.price.toLocaleString()}

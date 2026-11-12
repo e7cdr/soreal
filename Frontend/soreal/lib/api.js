@@ -1,11 +1,19 @@
 function getApiBaseUrl() {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
   if (typeof window !== "undefined") {
+    const configuredUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (configuredUrl) {
+      const url = new URL(configuredUrl, window.location.origin);
+      const isLoopback = ["localhost", "127.0.0.1", "::1"].includes(
+        url.hostname.toLowerCase(),
+      );
+      if (isLoopback && !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname.toLowerCase())) {
+        url.hostname = window.location.hostname;
+      }
+      return url.toString().replace(/\/$/, "");
+    }
     return `${window.location.protocol}//${window.location.hostname}:8000`;
   }
-  return "http://localhost:8000";
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 }
 
 function getHeaders() {
@@ -25,36 +33,57 @@ function getHeaders() {
   return headers;
 }
 
+async function fetchBackend(path, options = {}) {
+  const baseUrl = getApiBaseUrl();
+  try {
+    return await fetch(`${baseUrl}${path}`, options);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        `Cannot reach the SOREAL backend at ${baseUrl}. Check that the backend is running, both devices are on the same Wi-Fi, and the computer's firewall allows port 8000.`,
+      );
+    }
+    throw error;
+  }
+}
+
 export async function apiFetch(path, options = {}) {
+  const { skipAuth = false, redirectOnAuthError = true, ...requestOptions } = options;
   const headers = {
-    ...getHeaders(),
-    ...options.headers,
+    ...(skipAuth ? {} : getHeaders()),
+    ...requestOptions.headers,
   };
   if (
-    !(typeof FormData !== "undefined" && options.body instanceof FormData) &&
+    !(typeof FormData !== "undefined" && requestOptions.body instanceof FormData) &&
     !Object.keys(headers).some((name) => name.toLowerCase() === "content-type")
   ) {
     headers["Content-Type"] = "application/json";
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    ...options,
+  const response = await fetchBackend(path, {
+    ...requestOptions,
     headers,
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    const validationMessage =
+      error.detail ||
+      error.non_field_errors?.join(" ") ||
+      Object.values(error).flatMap((messages) => Array.isArray(messages) ? messages : []).join(" ");
     const missingCredentials =
       response.status === 403 &&
       error.detail === "Authentication credentials were not provided.";
     if (
+      redirectOnAuthError &&
       (response.status === 401 || missingCredentials) &&
-      typeof window !== "undefined"
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
     ) {
       const returnTo = `${window.location.pathname}${window.location.search}`;
       window.location.assign(`/login?next=${encodeURIComponent(returnTo)}`);
     }
-    throw new Error(error.detail || `API error: ${response.status}`);
+    throw new Error(validationMessage || `API error: ${response.status}`);
   }
 
   if (response.status === 204) return null;
@@ -110,14 +139,11 @@ export async function submitReport(data) {
 
 export async function exportBlacklistCSV() {
   const token = localStorage.getItem("auth_token");
-  const response = await fetch(
-    `${getApiBaseUrl()}/api/blacklist/persons/export_csv/`,
-    {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    }
-  );
+  const response = await fetchBackend("/api/blacklist/persons/export_csv/", {
+    headers: {
+      Authorization: `Token ${token}`,
+    },
+  });
   if (!response.ok) {
     throw new Error("Failed to export CSV");
   }
@@ -185,14 +211,11 @@ export async function fetchSavedSearchMatches(searchId) {
 
 export async function downloadSocialPost(slug) {
   const token = localStorage.getItem("auth_token");
-  const response = await fetch(
-    `${getApiBaseUrl()}/api/estates/properties/${slug}/social-post/`,
-    {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    }
-  );
+  const response = await fetchBackend(`/api/estates/properties/${slug}/social-post/`, {
+    headers: {
+      Authorization: `Token ${token}`,
+    },
+  });
   if (!response.ok) {
     throw new Error("Failed to download social post");
   }
@@ -229,11 +252,28 @@ export async function fetchLeadSummary(params = {}) {
   return apiFetch(`/api/estates/leads/summary/?${leadQueryString(params)}`);
 }
 
+export async function rescanLeadBrokerLinks() {
+  return apiFetch("/api/estates/leads/rescan_broker_links/", {
+    method: "POST",
+  });
+}
+
+export async function fetchBrokerCandidates() {
+  return apiFetch("/api/estates/leads/broker_candidates/");
+}
+
+export async function saveBrokerCandidates(candidateKeys) {
+  return apiFetch("/api/estates/leads/broker_candidates/", {
+    method: "POST",
+    body: JSON.stringify({ candidate_keys: candidateKeys }),
+  });
+}
+
 export async function downloadLeadExport(format, params = {}) {
   const query = leadQueryString(params);
   const separator = query ? "&" : "";
-  const response = await fetch(
-    `${getApiBaseUrl()}/api/estates/leads/export/?${query}${separator}file_format=${encodeURIComponent(format)}`,
+  const response = await fetchBackend(
+    `/api/estates/leads/export/?${query}${separator}file_format=${encodeURIComponent(format)}`,
     { headers: getHeaders() },
   );
   if (!response.ok) {
@@ -243,7 +283,8 @@ export async function downloadLeadExport(format, params = {}) {
       error.detail === "Authentication credentials were not provided.";
     if (
       (response.status === 401 || missingCredentials) &&
-      typeof window !== "undefined"
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
     ) {
       const returnTo = `${window.location.pathname}${window.location.search}`;
       window.location.assign(`/login?next=${encodeURIComponent(returnTo)}`);

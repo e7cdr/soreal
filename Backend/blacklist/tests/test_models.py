@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
+from rest_framework.test import APIClient
 
 from blacklist.models import (
     BlacklistedPerson,
@@ -12,6 +13,40 @@ from blacklist.models import (
 )
 from blacklist.utils import generate_case_id
 from estates.models import Property
+
+
+class StaffLoginApiTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="staff-login",
+            password="Correct-password-123",
+            is_staff=True,
+        )
+
+    def test_valid_staff_login_returns_token_and_user(self):
+        response = self.client.post(
+            "/api/blacklist/auth/login/",
+            {"username": "staff-login", "password": "Correct-password-123"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["token"])
+        self.assertEqual(response.data["user"]["username"], "staff-login")
+
+    def test_invalid_credentials_return_a_readable_validation_message(self):
+        response = self.client.post(
+            "/api/blacklist/auth/login/",
+            {"username": "staff-login", "password": "incorrect"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(
+            "Unable to log in with provided credentials.",
+            response.data["non_field_errors"],
+        )
 
 
 class CaseIdGenerationTest(TestCase):

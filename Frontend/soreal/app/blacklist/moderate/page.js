@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api";
 
 export default function ModerationPage() {
   const router = useRouter();
@@ -30,21 +31,15 @@ export default function ModerationPage() {
 
   async function loadSubmissions() {
     try {
-      const resp = await fetch("http://localhost:8000/api/blacklist/submissions/", {
-        headers: {
-          Authorization: `Token ${localStorage.getItem("auth_token")}`,
-        },
-      });
-      if (resp.status === 401 || resp.status === 403) {
+      const data = await apiFetch("/api/blacklist/submissions/");
+      setSubmissions(data.results || []);
+    } catch (err) {
+      if (err.message?.includes("Authentication credentials were not provided.") || err.message?.includes("Invalid token")) {
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_user");
         router.push("/login");
         return;
       }
-      if (!resp.ok) throw new Error("Failed to load submissions");
-      const data = await resp.json();
-      setSubmissions(data.results || []);
-    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -58,20 +53,10 @@ export default function ModerationPage() {
         : `/api/blacklist/submissions/${id}/reject/`;
 
     try {
-      const resp = await fetch(
-        `http://localhost:8000${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Token ${localStorage.getItem("auth_token")}`,
-          },
-          body: status === "rejected"
-            ? JSON.stringify({ rejection_reason: rejectionReason })
-            : JSON.stringify({}),
-        }
-      );
-      if (!resp.ok) throw new Error(`Failed to ${status} submission`);
+      await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(status === "rejected" ? { rejection_reason: rejectionReason } : {}),
+      });
       await loadSubmissions();
     } catch (err) {
       setError(err.message);

@@ -102,14 +102,16 @@ REM Wait a moment for Django to start
 timeout /t 3 >nul
 
 REM Start Next.js frontend in a new window
-echo [INFO] Starting Next.js frontend on http://localhost:3000...
-start "Soreal Frontend" cmd /k "cd /d ""%~dp0Frontend\soreal"" && npm run dev"
+echo [INFO] Starting Next.js frontend on http://localhost:3000 and the local Wi-Fi network...
+start "Soreal Frontend" cmd /k "cd /d ""%~dp0Frontend\soreal"" && npm run dev -- --hostname 0.0.0.0"
 
 echo.
 echo ============================================
 echo  Both servers are starting...
 echo  Backend:  http://localhost:8000
 echo  Frontend: http://localhost:3000
+echo  Wi-Fi:    Open http://<this-computer-ip>:3000 on another device on the same network.
+echo            The API will use the same computer IP on port 8000.
 echo  Admin:    http://localhost:8000/admin/
 echo ============================================
 echo.

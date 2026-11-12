@@ -88,6 +88,10 @@ export default function RequestDetailModal({ leadId, onClose, onSaved }) {
 
   function selectField(label, field, options) {
     const ignoredStatus = field === "status" && draft.status === "ignored";
+    const uniqueOptions = options.filter(
+      (option, index) =>
+        options.findIndex((candidate) => String(candidate.value) === String(option.value)) === index,
+    );
     return (
       <label className="block text-sm">
         <span className="mb-1 block font-medium">{label}</span>
@@ -98,9 +102,8 @@ export default function RequestDetailModal({ leadId, onClose, onSaved }) {
           className={FIELD_CLASS}
         >
           <option value="">—</option>
-          {ignoredStatus && <option value="ignored">{t("leadStatus_ignored")}</option>}
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
+          {uniqueOptions.map((option) => (
+            <option key={`${field}-${String(option.value)}`} value={String(option.value)}>{option.label}</option>
           ))}
         </select>
       </label>
@@ -158,7 +161,7 @@ export default function RequestDetailModal({ leadId, onClose, onSaved }) {
               {selectField(t("propertyType"), "property_type", ["apartment", "house", "villa", "land", "commercial"].map((value) => ({ value, label: t(value) })))}
               {selectField(t("brokerName"), "broker", [
                 { value: "", label: t("noBrokerLinked") },
-                ...(draft.broker && !brokers.some((broker) => broker.id === draft.broker) ? [{ value: draft.broker, label: draft.broker_name || t("broker") }] : []),
+                ...(draft.broker && !brokers.some((broker) => String(broker.id) === String(draft.broker)) ? [{ value: draft.broker, label: draft.broker_name || t("broker") }] : []),
                 ...brokers.map((broker) => ({ value: broker.id, label: broker.name })),
               ])}
               {selectField(t("listingType"), "listing_type", [

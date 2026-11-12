@@ -184,6 +184,11 @@ export default function ProjectsPage() {
               </button>
               <Link href={`/projects/${project.slug}/units`} className="block">
                 <h3 className="text-lg font-bold">{project.name}</h3>
+                {project.custom_id && (
+                  <p className="mb-1 text-xs font-semibold tracking-wide text-[var(--text-muted)]">
+                    {t("customId")}: {project.custom_id}
+                  </p>
+                )}
                 <p className="mb-2 text-sm text-gray-600">
                   {project.developer || "—"}
                 </p>

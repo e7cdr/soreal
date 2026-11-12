@@ -160,7 +160,12 @@ export default function ProjectUnitsPage({ params }) {
     <PageShell
       eyebrow={t("projects")}
       title={project.name}
-      description={[project.city, project.province, project.description].filter(Boolean).join(" · ")}
+      description={[
+        project.custom_id && `${t("customId")}: ${project.custom_id}`,
+        project.city,
+        project.province,
+        project.description,
+      ].filter(Boolean).join(" · ")}
       actions={(
         <>
           <button

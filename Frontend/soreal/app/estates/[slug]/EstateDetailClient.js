@@ -181,6 +181,11 @@ export default function EstateDetailClient({ estate }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
           <h1 className="text-3xl font-bold">{estate.title}</h1>
+          {estate.custom_id && (
+            <p className="text-sm font-semibold tracking-wide text-[var(--text-muted)]">
+              {t("customId")}: {estate.custom_id}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             {canManage && (
               <button
@@ -314,36 +319,47 @@ export default function EstateDetailClient({ estate }) {
               </p>
             )}
           </div>
-          {estate.latitude && estate.longitude && (
+          {(estate.latitude != null && estate.longitude != null || estate.city) && (
             <div className="mt-4">
-              <PropertyMap properties={[estate]} center={[estate.latitude, estate.longitude]} zoom={14} />
+              <PropertyMap
+                properties={[estate]}
+                center={estate.latitude != null && estate.longitude != null ? [estate.latitude, estate.longitude] : undefined}
+                zoom={14}
+              />
             </div>
           )}
         </div>
 
-        {estate.source_lead && (
+        {estate.source_lead_details && (
           <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded">
                 {t("sourceRequest")}
               </span>
               <Link
-                href={`/requests/${estate.source_lead.id}`}
+                href={`/requests/${estate.source_lead_details.id}`}
                 className="text-xs font-medium text-[var(--text-muted)] hover:underline"
               >
                 {t("viewRequest")}
               </Link>
             </div>
             <div className="space-y-1 text-sm">
-              <p className="font-semibold">{estate.source_lead.name || t("unknownRequester")}</p>
-              {estate.source_lead.phone && (
+              {estate.source_lead_details.broker_name ? (
+                <p className="font-semibold">{estate.source_lead_details.broker_name}</p>
+              ) : (
+                <p className="font-semibold">{estate.source_lead_details.name || t("unknownRequester")}</p>
+              )}
+              {estate.source_lead_details.broker_name && estate.source_lead_details.name && (
+                <p className="text-[var(--text-muted)]">{estate.source_lead_details.name}</p>
+              )}
+              {estate.source_lead_details.phone && (
                 <p className="text-[var(--text-muted)]">
-                  {estate.source_lead.phone}
+                  {estate.source_lead_details.phone}
                 </p>
               )}
-              {estate.source_lead.whatsapp_group && (
+              {estate.source_lead_details.whatsapp_group && (
                 <p className="text-[var(--text-muted)]">
-                  {estate.source_lead.whatsapp_group}
+                  {estate.source_lead_details.whatsapp_group}
                 </p>
               )}
               <p className="text-xs text-[var(--text-muted)]">

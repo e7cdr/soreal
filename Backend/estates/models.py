@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from django.db import models
 from django.utils.text import slugify
 from modelcluster.fields import ParentalKey
@@ -7,6 +10,11 @@ from wagtail.admin.panels import FieldPanel, MultiFieldPanel, InlinePanel
 from wagtail.fields import RichTextField
 from wagtail.images import get_image_model_string
 from wagtail.snippets.models import register_snippet
+
+
+def _new_custom_id(prefix):
+    alphabet = string.ascii_uppercase + string.digits
+    return f"{prefix}-" + "".join(secrets.choice(alphabet) for _ in range(5))
 
 
 class PropertyImage(Orderable):
@@ -59,6 +67,7 @@ class Property(ClusterableModel):
 
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
+    custom_id = models.CharField(max_length=8, unique=True, editable=False)
     description = RichTextField(blank=True, null=True)
 
     property_type = models.CharField(
@@ -126,6 +135,7 @@ class Property(ClusterableModel):
             [
                 FieldPanel("title"),
                 FieldPanel("slug"),
+                FieldPanel("custom_id", read_only=True),
                 FieldPanel("description"),
             ],
             heading="Basic Info",
@@ -170,6 +180,15 @@ class Property(ClusterableModel):
         return self.title
 
     def save(self, *args, **kwargs):
+        if not self.custom_id:
+            prefix = "RQ" if self.source_lead_id else "NM"
+            for _ in range(100):
+                custom_id = _new_custom_id(prefix)
+                if not Property.objects.filter(custom_id=custom_id).exists():
+                    self.custom_id = custom_id
+                    break
+            else:
+                raise RuntimeError("Unable to generate a unique estate ID.")
         if not self.slug:
             self.slug = slugify(self.title)
         super().save(*args, **kwargs)
@@ -704,6 +723,7 @@ class Project(models.Model):
 
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, blank=True)
+    custom_id = models.CharField(max_length=8, unique=True, editable=False)
     description = RichTextField(blank=True, null=True)
     developer = models.CharField(max_length=200, blank=True, null=True)
     broker = models.ForeignKey(
@@ -739,6 +759,7 @@ class Project(models.Model):
             [
                 FieldPanel("name"),
                 FieldPanel("slug"),
+                FieldPanel("custom_id", read_only=True),
                 FieldPanel("description"),
                 FieldPanel("developer"),
                 FieldPanel("broker"),
@@ -763,6 +784,14 @@ class Project(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        if not self.custom_id:
+            for _ in range(100):
+                custom_id = _new_custom_id("PR")
+                if not Project.objects.filter(custom_id=custom_id).exists():
+                    self.custom_id = custom_id
+                    break
+            else:
+                raise RuntimeError("Unable to generate a unique project ID.")
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)

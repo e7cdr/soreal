@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { MoreHorizontal } from "lucide-react";
 
-export default function ToolbarMenu({ label, children }) {
+export default function ToolbarMenu({ label, children, className = "" }) {
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function ToolbarMenu({ label, children }) {
   }
 
   return (
-    <details className="toolbar-menu" ref={menuRef}>
+    <details className={`toolbar-menu ${className}`.trim()} ref={menuRef}>
       <summary className="toolbar-button" aria-label={label} title={label}>
         <MoreHorizontal size={16} />
       </summary>
