@@ -294,7 +294,7 @@ def extract_lead_data(message: Dict[str, Any]) -> Dict[str, Any]:
     ):
         listing_type = "rent"
     elif re.search(
-        r"\b(?:buy|buying|purchase|comprar|compra|venta|vender)\b",
+        r"\b(?:buy|buying|purchase|comprar|compra|venta|vender|vendo|se\s+vende)\b",
         request,
         re.IGNORECASE,
     ):
