@@ -39,8 +39,8 @@ const EDITABLE_FIELDS = [
   "notes",
 ];
 
-function buyIntentBadge(listingType, t) {
-  if (listingType === "sale") return { label: t("buying"), color: "text-green-700 bg-green-100" };
+function listingIntentBadge(listingType, t) {
+  if (listingType === "sale") return { label: t("selling"), color: "text-orange-700 bg-orange-100" };
   if (listingType === "rent") return { label: t("renting"), color: "text-blue-700 bg-blue-100" };
   return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
 }
@@ -317,10 +317,10 @@ export default function RequestDetailPage() {
     >
 
       <div className="mb-3 flex items-center gap-2">
-        <span className={`rounded-md px-2 py-1 ${buyIntentBadge(lead.listing_type, t).color}`}>
-          {buyIntentBadge(lead.listing_type, t).label}
+        <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead.listing_type, t).color}`}>
+          {listingIntentBadge(lead.listing_type, t).label}
         </span>
-        <span className="text-xs text-[var(--text-muted)]">{t("buyIntent")}</span>
+        <span className="text-xs text-[var(--text-muted)]">{t("listingIntent")}</span>
       </div>
 
       {error && (

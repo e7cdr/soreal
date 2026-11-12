@@ -55,8 +55,8 @@ function formatPrice(lead) {
   return `${lead.min_price ?? "0"}–${lead.max_price ?? "∞"} ${currency}`.trim();
 }
 
-function buyIntentBadge(listingType, t) {
-  if (listingType === "sale") return { label: t("buying"), color: "text-green-700 bg-green-100" };
+function listingIntentBadge(listingType, t) {
+  if (listingType === "sale") return { label: t("selling"), color: "text-orange-700 bg-orange-100" };
   if (listingType === "rent") return { label: t("renting"), color: "text-blue-700 bg-blue-100" };
   return { label: t("looking"), color: "text-amber-700 bg-amber-100" };
 }
@@ -1091,8 +1091,8 @@ export default function RequestQueuePage() {
                     <select aria-label={t("listingType")} value={lead.listing_type || "any"} onChange={(event) => saveSpreadsheetCell(lead, "listing_type", event.target.value)} className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1">
                       {["any", "rent", "sale"].map((type) => <option key={type} value={type}>{type === "any" ? t("anyListingType") : t(`listing_${type}`)}</option>)}
                     </select>
-                    <span className={`mt-0.5 block inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${buyIntentBadge(lead.listing_type, t).color}`}>
-                      {buyIntentBadge(lead.listing_type, t).label}
+                    <span className={`mt-0.5 block inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${listingIntentBadge(lead.listing_type, t).color}`}>
+                      {listingIntentBadge(lead.listing_type, t).label}
                     </span>
                   </td>
                   <td className="px-3 py-2"><input aria-label={t("bedrooms")} type="number" min="0" defaultValue={lead.min_bedrooms ?? ""} onBlur={(event) => saveSpreadsheetCell(lead, "min_bedrooms", event.target.value)} className="w-20 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1" /></td>
@@ -1149,8 +1149,8 @@ export default function RequestQueuePage() {
               </div>
               <p className="mt-1 text-sm text-[var(--text-muted)]">{lead.phone || t("phoneNotFound")}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                <span className={`rounded-md px-2 py-1 ${buyIntentBadge(lead.listing_type, t).color}`}>
-                  {buyIntentBadge(lead.listing_type, t).label}
+                <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead.listing_type, t).color}`}>
+                  {listingIntentBadge(lead.listing_type, t).label}
                 </span>
                 {[lead.property_type && t(lead.property_type), lead.listing_type && lead.listing_type !== "any" && t(`listing_${lead.listing_type}`), lead.min_bedrooms != null && `${lead.min_bedrooms}+ ${t("bedroomsShort")}`, lead.city || lead.preferred_location, lead.province, formatPrice(lead)]
                   .filter(Boolean).map((value) => <span key={value} className="rounded-md bg-[var(--surface-muted)] px-2 py-1">{value}</span>)}
@@ -1275,8 +1275,8 @@ export default function RequestQueuePage() {
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className={`rounded-md px-2 py-1 ${buyIntentBadge(lead.listing_type, t).color}`}>
-                    {buyIntentBadge(lead.listing_type, t).label}
+                  <span className={`rounded-md px-2 py-1 ${listingIntentBadge(lead.listing_type, t).color}`}>
+                    {listingIntentBadge(lead.listing_type, t).label}
                   </span>
                   {[
                     lead.listing_type !== "any" && t(`listing_${lead.listing_type}`),
