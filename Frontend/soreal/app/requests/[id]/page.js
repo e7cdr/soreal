@@ -385,10 +385,10 @@ export default function RequestDetailPage() {
             ["land", t("land")],
             ["commercial", t("commercial")],
           ])}
-          {field(t("bedrooms"), "min_bedrooms", "number")}
-          {field(t("bedrooms"), "max_bedrooms", "number")}
-          {field(t("bathrooms"), "min_bathrooms", "number")}
-          {field(t("bathrooms"), "max_bathrooms", "number")}
+          {field(t("minBedrooms"), "min_bedrooms", "number")}
+          {field(t("maxBedrooms"), "max_bedrooms", "number")}
+          {field(t("minBathrooms"), "min_bathrooms", "number")}
+          {field(t("maxBathrooms"), "max_bathrooms", "number")}
           {field(t("minBudget"), "min_price", "number")}
           {field(t("maxBudget"), "max_price", "number")}
           {field(t("currency"), "budget_currency")}
@@ -398,8 +398,32 @@ export default function RequestDetailPage() {
             ["furnished", t("furnishing_furnished")],
             ["unfurnished", t("furnishing_unfurnished")],
           ])}
-          {field(t("city"), "city")}
-          {field(t("province"), "province")}
+          <label className="block text-sm font-medium text-[var(--foreground)]">
+            <span className="mb-1.5 block">{t("city")}</span>
+            <select
+              name="city"
+              value={form.city}
+              onChange={changeField}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
+            >
+              <option value="">—</option>
+              {form.city && !DOMINICAN_CITIES.includes(form.city) && <option value={form.city}>{form.city}</option>}
+              {DOMINICAN_CITIES.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-[var(--foreground)]">
+            <span className="mb-1.5 block">{t("province")}</span>
+            <select
+              name="province"
+              value={form.province}
+              onChange={changeField}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
+            >
+              <option value="">—</option>
+              {form.province && !DOMINICAN_PROVINCES.includes(form.province) && <option value={form.province}>{form.province}</option>}
+              {DOMINICAN_PROVINCES.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
           <label className="block text-sm font-medium text-[var(--foreground)] md:col-span-2">
             <span className="mb-1.5 block">{t("requestNotes")}</span>
             <textarea
