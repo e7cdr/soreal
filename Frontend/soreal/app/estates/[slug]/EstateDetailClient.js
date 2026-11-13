@@ -1,76 +1,88 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
-  submitInquiry,
+  ArrowLeft,
+  ArrowUpRight,
+  Download,
+  ExternalLink,
+  Heart,
+  MapPin,
+  Pencil,
+  Share2,
+} from "lucide-react";
+import {
   downloadSocialPost,
   fetchBrokers,
   fetchOwners,
   updateEstate,
 } from "@/lib/api";
-import dynamic from "next/dynamic";
 import { useTranslation } from "@/app/components/LanguageProvider";
+import PageShell from "@/app/components/PageShell";
+import ToolbarMenu from "@/app/components/ToolbarMenu";
 import {
   isFavorite,
   addFavorite,
   removeFavorite,
 } from "@/lib/favorites";
-import { Heart } from "lucide-react";
-import {
-  STORYTELLING_TEMPLATES,
-  PROPERTY_TYPE_TEMPLATES,
-  STORY_ANGLES,
-  getTemplateForPersona,
-  renderTemplate,
-} from "@/lib/storytelling-templates";
-import { DOMINICAN_CITIES, DOMINICAN_PROVINCES } from "@/lib/locations";
+import { renderTemplate } from "@/lib/storytelling-templates";
+import EstateGallery from "./EstateGallery";
+import EstateContactCard from "./EstateContactCard";
+import EstateInquiryForm from "./EstateInquiryForm";
+import EstateEditForm from "./EstateEditForm";
 
 const PropertyMap = dynamic(
   () => import("@/app/components/PropertyMap").then((mod) => mod.default),
-  { ssr: false, loading: () => <div className="w-full h-[400px] bg-gray-200 rounded-lg animate-pulse" /> }
+  { ssr: false, loading: () => <div className="estate-map-loading" /> },
 );
 
-function normalizePhoneForWhatsApp(phone) {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return null;
-  // Dominican Republic country code: 1 (809, 829, 849)
-  if (!digits.startsWith("1")) {
-    return `1${digits}`;
-  }
-  return digits;
-}
-
-function buildWhatsAppUrl(phone, text) {
-  const normalized = normalizePhoneForWhatsApp(phone);
-  if (!normalized) return null;
-  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+function buildDraft(estate) {
+  return {
+    title: estate.title || "",
+    description: estate.description || "",
+    property_type: estate.property_type || "apartment",
+    listing_type: estate.listing_type || "sale",
+    price: estate.price ?? "",
+    currency: estate.currency || "DOP",
+    bedrooms: estate.bedrooms ?? "",
+    bathrooms: estate.bathrooms ?? "",
+    area_sqm: estate.area_sqm ?? "",
+    address: estate.address || "",
+    city: estate.city || "",
+    province: estate.province || "",
+    status: estate.status || "draft",
+    latitude: estate.latitude ?? "",
+    longitude: estate.longitude ?? "",
+    broker: estate.broker || "",
+    owner: estate.owner || "",
+    persona_name: estate.persona_name || "",
+    persona_demographics: estate.persona_demographics || "",
+    persona_motivations: estate.persona_motivations || "",
+    persona_objections: estate.persona_objections || "",
+    persona_marketing_angle: estate.persona_marketing_angle || "",
+  };
 }
 
 export default function EstateDetailClient({ estate }) {
   const { translate: t } = useTranslation();
-  const coverImage =
-    estate.images?.find((img) => img.is_cover)?.image_url ||
-    estate.images?.[0]?.image_url ||
-    null;
-
-  const typeLabel = t(estate.property_type);
-  const listingLabel = t(estate.listing_type);
 
   const [isFav, setIsFav] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(null);
-  const [downloading, setDownloading] = useState(false);
   const [canManage, setCanManage] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [savingEstate, setSavingEstate] = useState(false);
-  const [estateDraft, setEstateDraft] = useState(null);
+  const [inquiryOpen, setInquiryOpen] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [draft, setDraft] = useState(null);
   const [brokers, setBrokers] = useState([]);
   const [owners, setOwners] = useState([]);
-  const [storyTemplate, setStoryTemplate] = useState(null);
+  const [savingEstate, setSavingEstate] = useState(false);
   const [showStoryHelper, setShowStoryHelper] = useState(false);
+
+  const editRef = useRef(null);
+  const loadedRef = useRef({ brokers: false, owners: false });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -78,62 +90,69 @@ export default function EstateDetailClient({ estate }) {
     setCanManage(Boolean(localStorage.getItem("auth_token")));
   }, [estate.id]);
 
-  function startEditing() {
-    setEstateDraft({
-      title: estate.title || "",
-      description: estate.description || "",
-      property_type: estate.property_type || "apartment",
-      listing_type: estate.listing_type || "sale",
-      price: estate.price ?? "",
-      currency: estate.currency || "DOP",
-      bedrooms: estate.bedrooms ?? "",
-      bathrooms: estate.bathrooms ?? "",
-      area_sqm: estate.area_sqm ?? "",
-      address: estate.address || "",
-      city: estate.city || "",
-      province: estate.province || "",
-      status: estate.status || "draft",
-      latitude: estate.latitude ?? "",
-      longitude: estate.longitude ?? "",
-      broker: estate.broker || "",
-      owner: estate.owner || "",
-      persona_name: estate.persona_name || "",
-      persona_demographics: estate.persona_demographics || "",
-      persona_motivations: estate.persona_motivations || "",
-      persona_objections: estate.persona_objections || "",
-      persona_marketing_angle: estate.persona_marketing_angle || "",
-    });
-    setError(null);
-    setEditing(true);
-    fetchBrokers().then((response) => setBrokers(response.results || [])).catch((loadError) => setError(loadError.message));
-    fetchOwners().then((response) => setOwners(response.results || [])).catch((loadError) => setError(loadError.message));
+  const ensureEditData = useCallback(() => {
+    setDraft((current) => current ?? buildDraft(estate));
+
+    if (!loadedRef.current.brokers) {
+      loadedRef.current.brokers = true;
+      fetchBrokers()
+        .then((response) => setBrokers(response.results || []))
+        .catch((loadError) => {
+          loadedRef.current.brokers = false;
+          setError(loadError.message || t("error"));
+        });
+    }
+    if (!loadedRef.current.owners) {
+      loadedRef.current.owners = true;
+      fetchOwners()
+        .then((response) => setOwners(response.results || []))
+        .catch((loadError) => {
+          loadedRef.current.owners = false;
+          setError(loadError.message || t("error"));
+        });
+    }
+  }, [estate, t]);
+
+  function openEdit() {
+    ensureEditData();
+    const node = editRef.current;
+    if (node) {
+      node.open = true;
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function closeEdit() {
+    if (editRef.current) editRef.current.open = false;
+  }
+
+  function handleEditToggle(event) {
+    if (event.currentTarget.open) ensureEditData();
   }
 
   function applyStoryTemplate(template) {
-    const rendered = renderTemplate(template, estateDraft);
-    setEstateDraft((prev) => ({
-      ...prev,
-      description: rendered,
+    setDraft((current) => ({
+      ...current,
+      description: renderTemplate(template, current),
     }));
-    setStoryTemplate(template);
     setShowStoryHelper(false);
   }
 
-  async function saveEstateChanges(event) {
+  async function saveEstate(event) {
     event.preventDefault();
     setSavingEstate(true);
     setError(null);
     try {
       await updateEstate(estate.slug, {
-        ...estateDraft,
-        price: estateDraft.price === "" ? null : Number(estateDraft.price),
-        bedrooms: estateDraft.bedrooms === "" ? null : Number(estateDraft.bedrooms),
-        bathrooms: estateDraft.bathrooms === "" ? null : Number(estateDraft.bathrooms),
-        area_sqm: estateDraft.area_sqm === "" ? null : Number(estateDraft.area_sqm),
-        latitude: estateDraft.latitude === "" ? null : Number(estateDraft.latitude),
-        longitude: estateDraft.longitude === "" ? null : Number(estateDraft.longitude),
-        broker: estateDraft.broker ? Number(estateDraft.broker) : null,
-        owner: estateDraft.owner ? Number(estateDraft.owner) : null,
+        ...draft,
+        price: draft.price === "" ? null : Number(draft.price),
+        bedrooms: draft.bedrooms === "" ? null : Number(draft.bedrooms),
+        bathrooms: draft.bathrooms === "" ? null : Number(draft.bathrooms),
+        area_sqm: draft.area_sqm === "" ? null : Number(draft.area_sqm),
+        latitude: draft.latitude === "" ? null : Number(draft.latitude),
+        longitude: draft.longitude === "" ? null : Number(draft.longitude),
+        broker: draft.broker ? Number(draft.broker) : null,
+        owner: draft.owner ? Number(draft.owner) : null,
       });
       window.location.reload();
     } catch (saveError) {
@@ -143,7 +162,7 @@ export default function EstateDetailClient({ estate }) {
     }
   }
 
-  const toggleFavorite = () => {
+  function toggleFavorite() {
     if (isFav) {
       removeFavorite(estate.id);
       setIsFav(false);
@@ -151,484 +170,282 @@ export default function EstateDetailClient({ estate }) {
       addFavorite(estate.id);
       setIsFav(true);
     }
-  };
+  }
 
-  const handleDownloadPost = async () => {
+  async function handleDownloadPost() {
     setDownloading(true);
     try {
       const response = await downloadSocialPost(estate.slug);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${estate.slug}_social_post.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${estate.slug}_social_post.zip`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.message || "Failed to download social post");
+    } catch (downloadError) {
+      setError(downloadError.message || t("error"));
     } finally {
       setDownloading(false);
     }
-  };
+  }
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    id_type: "ID_Card",
-    identification: "",
-    message: "",
-  });
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await submitInquiry(estate.id, form);
-      setSubmitted(true);
-    } catch (err) {
-      setError(err.message || "Failed to submit inquiry.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (submitted) {
-    return (
-      <div className="p-6 max-w-md mx-auto">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-bold text-green-800">
-            {t("inquirySent")}
-          </h2>
-          <p className="mt-2 text-green-700">
-            {t("inquirySubtitle", { title: estate.title })}
-          </p>
-        </div>
-        <Link
-          href={`/estates/${estate.slug}`}
-          className="mt-6 text-blue-600 hover:underline"
-        >
-          {t("backToListing")}
-        </Link>
-      </div>
+  function shareOnFacebook() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      "_blank",
+      "width=600,height=400",
     );
   }
 
+  const hasCoordinates =
+    estate.latitude !== null &&
+    estate.latitude !== undefined &&
+    estate.longitude !== null &&
+    estate.longitude !== undefined;
+  const locationLabel = [estate.city, estate.province].filter(Boolean).join(", ");
+
   return (
-    <div className="p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="space-y-6">
-          <h1 className="text-3xl font-bold">{estate.title}</h1>
-          {estate.custom_id && (
-            <p className="text-sm font-semibold tracking-wide text-[var(--text-muted)]">
-              {t("customId")}: {estate.custom_id}
-            </p>
+    <PageShell
+      eyebrow={
+        <Link href="/estates" className="estate-back-link">
+          <ArrowLeft size={12} aria-hidden="true" />
+          {t("backToEstates")}
+        </Link>
+      }
+      title={estate.title}
+      description={
+        <span className="estate-head-meta">
+          {locationLabel && (
+            <span>
+              <MapPin size={12} aria-hidden="true" />
+              {locationLabel}
+            </span>
           )}
-          <div className="flex items-center gap-2">
-            {canManage && (
-              <button
-                type="button"
-                onClick={editing ? () => setEditing(false) : startEditing}
-                className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
-              >
-                {editing ? t("cancel") : t("editEstate")}
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleFavorite();
-              }}
-              className="p-2 bg-gray-100 rounded hover:bg-gray-200"
-            >
-              {isFav ? (
-                <Heart className="w-6 h-6 text-red-500 fill-red-500" />
-              ) : (
-                <Heart className="w-6 h-6 text-gray-400 hover:text-red-500" />
-              )}
-            </button>
-            <button
-              onClick={handleDownloadPost}
-              disabled={downloading}
-              className="p-2 bg-blue-100 rounded hover:bg-blue-200"
-              title="Download Social Media Post"
-            >
-              <span className="text-blue-600">📱</span>
-            </button>
-            {estate.phone && (
-              <a
-                href={buildWhatsAppUrl(estate.phone, t("whatsappContactEstate", { title: estate.title })) || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 bg-green-100 rounded hover:bg-green-200"
-                title={t("whatsappContact")}
-              >
-                <span className="text-green-600">📱</span>
-              </a>
-            )}
+          {estate.custom_id && (
+            <span className="estate-head-id">
+              {t("customId")}: {estate.custom_id}
+            </span>
+          )}
+        </span>
+      }
+      actions={
+        <>
+          <span className={`estate-status-badge estate-status-${estate.status || "draft"}`}>
+            {t(estate.status || "draft")}
+          </span>
+
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={toggleFavorite}
+            aria-pressed={isFav}
+            aria-label={isFav ? t("removeFavorite") : t("addToFavorites")}
+            title={isFav ? t("removeFavorite") : t("addToFavorites")}
+          >
+            <Heart
+              size={16}
+              className={isFav ? "estate-heart-active" : undefined}
+              aria-hidden="true"
+            />
+          </button>
+
+          {canManage && (
             <button
               type="button"
-              onClick={() => {
-                window.open(
-                  `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-                    typeof window !== "undefined" ? window.location.href : ""
-                  )}`,
-                  "_blank",
-                  "width=600,height=400"
-                );
-              }}
-              className="p-2 bg-blue-100 rounded hover:bg-blue-200"
-              title={t("shareFacebook")}
+              className="toolbar-button"
+              onClick={openEdit}
+              aria-label={t("editEstate")}
+              title={t("editEstate")}
             >
-              <span className="text-blue-600">👍</span>
+              <Pencil size={16} aria-hidden="true" />
             </button>
-          </div>
-          {editing && estateDraft && (
-            <form onSubmit={saveEstateChanges} className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-              <h2 className="font-semibold">{t("editEstate")}</h2>
-              {[
-                ["title", t("estateTitle"), "text"],
-                ["property_type", t("propertyType"), "propertyType"],
-                ["listing_type", t("listingType"), "listingType"],
-                ["status", t("status"), "status"],
-                ["price", t("price"), "number"],
-                ["currency", t("currency"), "text"],
-                ["bedrooms", t("bedrooms"), "number"],
-                ["bathrooms", t("bathrooms"), "number"],
-                ["area_sqm", t("areaSqm"), "number"],
-                ["address", t("address"), "text"],
-                ["province", t("province"), "province"],
-                ["city", t("city"), "city"],
-                ["latitude", t("latitude"), "latitude"],
-                ["longitude", t("longitude"), "longitude"],
-                ["persona_name", t("personaName"), "text"],
-                ["persona_demographics", t("personaDemographics"), "text"],
-                ["persona_motivations", t("personaMotivations"), "textarea"],
-                ["persona_objections", t("personaObjections"), "textarea"],
-                ["persona_marketing_angle", t("personaMarketingAngle"), "textarea"],
-                ["broker", t("brokerName"), "broker"],
-                ["owner", t("owner"), "owner"],
-              ].map(([field, label, type]) => {
-                const options = type === "propertyType"
-                  ? ["apartment", "house", "villa", "land", "commercial"].map((value) => ({ value, label: t(value) }))
-                  : type === "listingType"
-                    ? ["sale", "rent"].map((value) => ({ value, label: t(`listing_${value}`) }))
-                    : type === "status"
-                      ? ["draft", "available", "reserved", "sold", "rented", "inactive"].map((value) => ({ value, label: t(value) }))
-                      : type === "province"
-                        ? DOMINICAN_PROVINCES.map((value) => ({ value, label: value }))
-                        : type === "city"
-                          ? DOMINICAN_CITIES.map((value) => ({ value, label: value }))
-                          : type === "broker"
-                            ? brokers.map((item) => ({ value: item.id, label: item.name }))
-                            : type === "owner"
-                              ? owners.map((item) => ({ value: item.id, label: item.name }))
-                              : null;
-                return (
-                  <label key={field} className="block text-sm">
-                    <span className="mb-1 block font-medium">{label}</span>
-                    {options ? (
-                      <select value={estateDraft[field] ?? ""} onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]">
-                        {["broker", "owner", "province", "city"].includes(type) && <option value="">{type === "broker" ? t("noBrokerLinked") : type === "owner" ? t("noOwnerLinked") : "—"}</option>}
-                        {estateDraft[field] && !options.some((option) => String(option.value) === String(estateDraft[field])) && <option value={estateDraft[field]}>{estateDraft[field]}</option>}
-                        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                      </select>
-                    ) : ["latitude", "longitude"].includes(type) ? (
-                      <input
-                        type="number"
-                        step="any"
-                        value={estateDraft[field]}
-                        onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })}
-                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
-                      />
-                    ) : type === "textarea" ? (
-                      <textarea
-                        rows={3}
-                        value={estateDraft[field]}
-                        onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })}
-                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
-                      />
-                    ) : (
-                      <input type={type} min={type === "number" ? "0" : undefined} step={field === "price" ? "0.01" : "1"} value={estateDraft[field]} onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" />
-                    )}
-                  </label>
-                );
-              })}
-              {estateDraft.persona_name && (
-                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold">{t("storytellingHelper")}</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowStoryHelper((prev) => !prev)}
-                      className="text-xs text-[var(--text-muted)] hover:underline"
-                    >
-                      {showStoryHelper ? t("hideHelper") : t("showHelper")}
-                    </button>
-                  </div>
-                  {showStoryHelper && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {t("personaSelected", { name: estateDraft.persona_name })}
-                      </p>
-                      {Object.entries(STORYTELLING_TEMPLATES).map(([key, tmpl]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => applyStoryTemplate(tmpl)}
-                          className="w-full text-left text-xs text-[var(--foreground)] hover:bg-[var(--surface-muted)] p-2 rounded border border-transparent hover:border-[var(--border)]"
-                        >
-                          <span className="font-semibold">{tmpl.name}</span>
-                          <span className="block text-[var(--text-muted)] text-[10px] mt-0.5">
-                            {t("storyAngle")}: {tmpl.useCases.join(", ")}
-                          </span>
-                        </button>
-                      ))}
-                      <div className="pt-2 border-t border-[var(--border)]">
-                        <span className="text-xs font-medium text-[var(--text-muted)] block mb-1">
-                          {t("storyAngles")}
-                        </span>
-                        {Object.entries(STORY_ANGLES).map(([key, desc]) => (
-                          <p key={key} className="text-xs text-[var(--text-muted)] mb-1">
-                            <span className="font-semibold">{key}:</span> {desc}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <label className="block text-sm"><span className="mb-1 block font-medium">{t("description")}</span><textarea rows={4} value={estateDraft.description} onChange={(event) => setEstateDraft({ ...estateDraft, description: event.target.value })} className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]" /></label>
-              <button disabled={savingEstate} className="rounded-lg bg-[var(--green)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{savingEstate ? t("saving") : t("saveChanges")}</button>
-            </form>
           )}
-          {coverImage ? (
-            <img
-              src={coverImage}
-              alt={estate.title}
-              className="w-full h-64 object-cover rounded-lg"
-            />
-          ) : (
-            <div className="w-full h-64 border rounded-lg flex items-center justify-center">
-              No image available
-            </div>
-          )}
-          {estate.images?.slice(1).map((img, i) => (
-            <img
-              key={i}
-              src={img.image_url}
-              alt={img.caption || "Image"}
-              className="mt-2 w-32 h-32 object-cover rounded"
-              loading="lazy"
-              decoding="async"
-            />
-          ))}
-          <div className="space-y-2">
-            <p className="text-gray-600">
-              {estate.city}, {estate.province}
-            </p>
-            <p className="text-gray-600">
-              {typeLabel} · {listingLabel}
-            </p>
-            {estate.bedrooms && (
-              <p className="text-gray-600">
-                {estate.bedrooms} {t("beds")}
-              </p>
-            )}
-            {estate.bathrooms && (
-              <p className="text-gray-600">
-                {estate.bathrooms} {t("baths")}
-              </p>
-            )}
-            {estate.area_sqm && (
-              <p className="text-gray-600">{estate.area_sqm} {t("sqm")}</p>
-            )}
-            {estate.price && (
-              <p className="text-2xl font-bold">
-                {estate.currency} {estate.price.toLocaleString()}
-              </p>
-            )}
-            {estate.source_url && estate.source_site && (
+
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={shareOnFacebook}
+            aria-label={t("shareFacebook")}
+            title={t("shareFacebook")}
+          >
+            <Share2 size={16} aria-hidden="true" />
+          </button>
+
+          <ToolbarMenu label={t("moreActions")}>
+            <button
+              type="button"
+              className="toolbar-menu-item"
+              onClick={handleDownloadPost}
+              disabled={downloading}
+            >
+              <Download size={14} aria-hidden="true" />
+              {downloading ? t("loading") : t("downloadSocialPost")}
+            </button>
+            {estate.source_url && (
               <a
+                className="toolbar-menu-item"
                 href={estate.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:underline"
               >
-                🔗 {t("viewOriginal")}
+                <ExternalLink size={14} aria-hidden="true" />
+                {t("viewOriginal")}
               </a>
             )}
-          </div>
-          {(estate.latitude != null && estate.longitude != null || estate.city) && (
-            <div className="mt-4">
-              <PropertyMap
-                properties={[estate]}
-                center={estate.latitude != null && estate.longitude != null ? [estate.latitude, estate.longitude] : undefined}
-                zoom={14}
-              />
-            </div>
-          )}
+          </ToolbarMenu>
+        </>
+      }
+      bodyClassName="estate-page-body"
+    >
+      {error && (
+        <p role="alert" className="estate-form-error">
+          {error}
+        </p>
+      )}
+
+      <div className="estate-layout">
+        <div className="estate-gallery-col">
+          <EstateGallery images={estate.images} title={estate.title} t={t} />
         </div>
 
-        {estate.source_lead_details && (
-          <div className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded">
-                {t("sourceRequest")}
-              </span>
-              <Link
-                href={`/requests/${estate.source_lead_details.id}`}
-                className="text-xs font-medium text-[var(--text-muted)] hover:underline"
-              >
-                {t("viewRequest")}
-              </Link>
-            </div>
-            <div className="space-y-1 text-sm">
-              {estate.source_lead_details.broker_name ? (
-                <p className="font-semibold">{estate.source_lead_details.broker_name}</p>
-              ) : (
-                <p className="font-semibold">{estate.source_lead_details.name || t("unknownRequester")}</p>
-              )}
-              {estate.source_lead_details.broker_name && estate.source_lead_details.name && (
-                <p className="text-[var(--text-muted)]">{estate.source_lead_details.name}</p>
-              )}
-              {estate.source_lead_details.phone && (
-                <p className="text-[var(--text-muted)]">
-                  {estate.source_lead_details.phone}
-                </p>
-              )}
-              {estate.source_lead_details.whatsapp_group && (
-                <p className="text-[var(--text-muted)]">
-                  {estate.source_lead_details.whatsapp_group}
-                </p>
-              )}
-              <p className="text-xs text-[var(--text-muted)]">
-                {t("sourceRequestDescription")}
-              </p>
-            </div>
-          </div>
-        )}
+        <aside className="estate-side">
+          <EstateContactCard
+            estate={estate}
+            t={t}
+            inquiryOpen={inquiryOpen}
+            onToggleInquiry={() => setInquiryOpen((previous) => !previous)}
+          />
+          {inquiryOpen && (
+            <EstateInquiryForm estateId={estate.id} title={estate.title} t={t} />
+          )}
+        </aside>
 
-        <div>
-          {estate.description && (
-            <div className="mb-6">
-              <h2 className="text-xl font-bold mb-2">{t("description")}</h2>
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: estate.description }}
+        <div className="estate-main">
+          {(hasCoordinates || estate.city) && (
+            <section className="estate-map-card">
+              <PropertyMap
+                properties={[estate]}
+                center={hasCoordinates ? [estate.latitude, estate.longitude] : undefined}
+                zoom={14}
+                height={240}
               />
-            </div>
+              {hasCoordinates && (
+                <a
+                  className="estate-map-link"
+                  href={`https://www.google.com/maps/search/?api=1&query=${estate.latitude},${estate.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MapPin size={13} aria-hidden="true" />
+                  {t("openInGoogleMaps")}
+                  <ArrowUpRight size={12} aria-hidden="true" />
+                </a>
+              )}
+            </section>
           )}
 
-          {!submitted && (
-            <div className="bg-gray-50 p-6 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">
-                {t("sendInquiry")}
-              </h2>
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-                  {error}
-                </div>
-              )}
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("fullName")} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("email")} <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("phone")}
-                  </label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("idType")}
-                  </label>
-                  <select
-                    name="id_type"
-                    value={form.id_type}
-                    onChange={handleChange}
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+          {estate.source_lead_details && (
+            <details className="estate-collapsible">
+              <summary>
+                <span className="estate-source-badge">{t("sourceRequest")}</span>
+                <span className="estate-summary-text">
+                  {estate.source_lead_details.broker_name ||
+                    estate.source_lead_details.name ||
+                    t("unknownRequester")}
+                </span>
+              </summary>
+              <div className="estate-collapsible-body">
+                <div className="estate-source-body">
+                  {estate.source_lead_details.broker_name ? (
+                    <p className="estate-source-name">{estate.source_lead_details.broker_name}</p>
+                  ) : (
+                    <p className="estate-source-name">
+                      {estate.source_lead_details.name || t("unknownRequester")}
+                    </p>
+                  )}
+                  {estate.source_lead_details.broker_name && estate.source_lead_details.name && (
+                    <p className="estate-muted">{estate.source_lead_details.name}</p>
+                  )}
+                  {estate.source_lead_details.phone && (
+                    <p className="estate-muted">{estate.source_lead_details.phone}</p>
+                  )}
+                  {estate.source_lead_details.whatsapp_group && (
+                    <p className="estate-muted">{estate.source_lead_details.whatsapp_group}</p>
+                  )}
+                  <p className="estate-muted">{t("sourceRequestDescription")}</p>
+                  <Link
+                    href={`/requests/${estate.source_lead_details.id}`}
+                    className="estate-link-button"
                   >
-                    <option value="ID_Card">{t("idCard")}</option>
-                    <option value="Passport">Passport</option>
-                  </select>
+                    {t("viewRequest")}
+                  </Link>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("idNumber")}
-                  </label>
-                  <input
-                    type="text"
-                    name="identification"
-                    value={form.identification}
-                    onChange={handleChange}
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder={t("idNumberPlaceholder")}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("message")}
-                  </label>
-                  <textarea
-                    name="message"
-                    value={form.message}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder={t("anyQuestions")}
-                  />
-                </div>
+              </div>
+            </details>
+          )}
+
+          <section className="estate-card estate-description-card">
+            <h2 className="estate-section-title">{t("description")}</h2>
+            {estate.description ? (
+              <>
+                <div
+                  className={`estate-description ${
+                    descriptionExpanded ? "" : "estate-description-clamped"
+                  }`.trim()}
+                  dangerouslySetInnerHTML={{ __html: estate.description }}
+                />
                 <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 font-medium"
+                  type="button"
+                  className="estate-link-button"
+                  onClick={() => setDescriptionExpanded((previous) => !previous)}
+                  aria-expanded={descriptionExpanded}
                 >
-                  {submitting ? t("sending") : t("send")}
+                  {descriptionExpanded ? t("showLess") : t("showMore")}
                 </button>
-              </form>
-            </div>
+              </>
+            ) : (
+              <p className="estate-muted">{t("noDescription")}</p>
+            )}
+          </section>
+
+          {canManage && (
+            <details
+              ref={editRef}
+              className="estate-collapsible estate-edit-section"
+              onToggle={handleEditToggle}
+            >
+              <summary>
+                <Pencil size={14} aria-hidden="true" />
+                {t("editEstate")}
+              </summary>
+              <div className="estate-collapsible-body">
+                {draft ? (
+                  <EstateEditForm
+                    t={t}
+                    draft={draft}
+                    setDraft={setDraft}
+                    brokers={brokers}
+                    owners={owners}
+                    saving={savingEstate}
+                    error={null}
+                    onSubmit={saveEstate}
+                    onCancel={closeEdit}
+                    showStoryHelper={showStoryHelper}
+                    setShowStoryHelper={setShowStoryHelper}
+                    applyStoryTemplate={applyStoryTemplate}
+                  />
+                ) : (
+                  <p className="estate-muted">{t("loading")}</p>
+                )}
+              </div>
+            </details>
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

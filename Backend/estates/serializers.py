@@ -44,6 +44,12 @@ class PropertyImageSerializer(serializers.ModelSerializer):
 class PropertySerializer(serializers.ModelSerializer):
     images = PropertyImageSerializer(many=True, read_only=True)
     broker_name = serializers.CharField(source="broker.name", read_only=True, allow_null=True)
+    broker_phone = serializers.CharField(
+        source="broker.phone", read_only=True, allow_null=True, allow_blank=True
+    )
+    # Owner contact details are private: only staff requests receive them.
+    owner_name = serializers.SerializerMethodField()
+    owner_phone = serializers.SerializerMethodField()
     source_lead_details = serializers.SerializerMethodField()
 
     class Meta:
@@ -73,7 +79,10 @@ class PropertySerializer(serializers.ModelSerializer):
             "amenities",
             "broker",
             "broker_name",
+            "broker_phone",
             "owner",
+            "owner_name",
+            "owner_phone",
             "source_lead",
             "source_lead_details",
             "source_site",
@@ -91,6 +100,21 @@ class PropertySerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["slug", "source_lead", "created_at", "updated_at"]
+
+    def get_owner_name(self, obj):
+        if not self._request_user_is_staff() or not obj.owner_id:
+            return None
+        return obj.owner.name
+
+    def get_owner_phone(self, obj):
+        if not self._request_user_is_staff() or not obj.owner_id:
+            return None
+        return obj.owner.phone or None
+
+    def _request_user_is_staff(self):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        return bool(user and user.is_authenticated and user.is_staff)
 
     def get_source_lead_details(self, obj):
         lead = obj.source_lead
