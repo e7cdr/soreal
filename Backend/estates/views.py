@@ -56,3 +56,38 @@ def sitemap_xml(request):
     xml += "</urlset>\n"
 
     return HttpResponse(xml, content_type="application/xml")
+
+
+@csrf_exempt
+def health_check(request):
+    """Health check endpoint for uptime monitoring.
+
+    Returns 200 OK with a JSON body indicating the service is healthy.
+    Includes a database connectivity check so monitors can detect
+    database outages.
+    """
+    import json
+    from django.db import connection
+    from django.utils import timezone
+
+    db_ok = True
+    db_error = None
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception as exc:  # pragma: no cover - defensive
+        db_ok = False
+        db_error = str(exc)
+
+    status = "ok" if db_ok else "degraded"
+    payload = {
+        "status": status,
+        "service": "soreal-backend",
+        "timestamp": timezone.now().isoformat(),
+        "database": "ok" if db_ok else f"error: {db_error}",
+    }
+    return HttpResponse(
+        json.dumps(payload),
+        content_type="application/json",
+        status=200 if db_ok else 503,
+    )

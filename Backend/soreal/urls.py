@@ -18,6 +18,8 @@ urlpatterns = [
     path("api/estates/", include("estates.api_urls")),
     path("robots.txt", estate_views.robots_txt, name="robots_txt"),
     path("sitemap.xml", estate_views.sitemap_xml, name="sitemap_xml"),
+    path("health", estate_views.health_check, name="health_check"),
+    path("health/", estate_views.health_check, name="health_check_slash"),
 ]
 
 
