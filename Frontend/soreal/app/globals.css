@@ -1,9 +1,17 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
-/* Leaflet attribution control should not block the navigation menu */
-.leaflet-control-attribution {
-  z-index: 1 !important;
+/* Push the entire Leaflet map below all UI overlays so its attribution
+   control, markers, and popups never block navigation menus or popovers. */
+.leaflet-container {
+  z-index: -1 !important;
+}
+
+/* Make sure navigation dropdowns and filter popovers paint above
+   anything that might still create a stacking context. */
+.more-menu-panel,
+.filter-popover-panel {
+  z-index: 2000 !important;
 }
 
 :root {
