@@ -54,16 +54,11 @@ function propertyCoordinates(property) {
   return city ? CITY_COORDINATES[city] : null;
 }
 
-// Theme-aware tile layers: Dark Matter by default, Positron for light mode
-const TILE_LAYERS = {
-  dark: {
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
-  light: {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution: '&copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
+// Theme-aware tile layers: OpenStreetMap (free, no API key required).
+// Both themes use the same tile source; marker/popup colors adapt to theme.
+const TILE_LAYER = {
+  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 };
 
 export default function PropertyMap({ properties, center, zoom = 10, height = 320 }) {
@@ -71,7 +66,6 @@ export default function PropertyMap({ properties, center, zoom = 10, height = 32
   const { theme } = useTheme();
   const [map, setMap] = useState(null);
   const [mounted, setMounted] = useState(false);
-  const tileLayer = TILE_LAYERS[theme];
   const mappedProperties = useMemo(
     () =>
       properties
@@ -120,7 +114,7 @@ export default function PropertyMap({ properties, center, zoom = 10, height = 32
         whenCreated={(m) => setMap(m)}
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer url={tileLayer.url} attribution={tileLayer.attribution} />
+        <TileLayer url={TILE_LAYER.url} attribution={TILE_LAYER.attribution} />
         {mappedProperties.map(({ property: p, coordinates }) => (
           <Marker key={p.id} position={coordinates}>
             <Popup>
