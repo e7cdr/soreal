@@ -55,7 +55,8 @@ function propertyCoordinates(property) {
 }
 
 // Theme-aware tile layers: OpenStreetMap (free, no API key required).
-// Both themes use the same tile source; marker/popup colors adapt to theme.
+// Dark mode applies a CSS invert filter to the MapContainer so tiles look dark
+// without needing a paid dark tile service.
 const TILE_LAYER = {
   url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -112,6 +113,7 @@ export default function PropertyMap({ properties, center, zoom = 10, height = 32
         center={initialCenter}
         zoom={zoom}
         whenCreated={(m) => setMap(m)}
+        className={theme === "dark" ? "map-dark" : ""}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer url={TILE_LAYER.url} attribution={TILE_LAYER.attribution} />

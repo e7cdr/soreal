@@ -49,6 +49,11 @@
   border-radius: 0 0 4px 4px !important;
 }
 
+/* Dark theme map: invert only the tile layer so markers/popups stay normal */
+.map-dark .leaflet-tile-pane {
+  filter: invert(0.85) hue-rotate(180deg) contrast(0.9) saturate(0.8) !important;
+}
+
 :root {
   color-scheme: light;
   --background: #f5f8f5;
