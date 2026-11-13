@@ -709,6 +709,20 @@ export async function publishReel(reelId, platform) {
   });
 }
 
+export async function createReelFromTemplate(templateId, data = {}) {
+  return apiFetch(`/api/estates/reel-templates/${templateId}/use_template/`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function batchRenderReels(reelIds) {
+  return apiFetch("/api/estates/reels/batch_render/", {
+    method: "POST",
+    body: JSON.stringify({ reel_ids: reelIds }),
+  });
+}
+
 // Reel slides
 export async function fetchReelSlides(params = {}) {
   const searchParams = new URLSearchParams();

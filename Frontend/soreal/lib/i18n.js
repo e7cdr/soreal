@@ -646,6 +646,13 @@ export const translations = {
     holdDuration: "Hold Duration (seconds)",
     noBpmAvailable: "No BPM available. Analyze an audio track first.",
     syncing: "Syncing...",
+    createReel: "Create Reel",
+    useTemplateDescription: "Enter a title for your new reel. Slides will be auto-populated from the template settings.",
+    selectAll: "Select All",
+    selected: "Selected",
+    total: "Total",
+    renderSelected: "Batch Render",
+    clearSelection: "Clear Selection",
 
     // Distribution
     distribution: "Distribution",
@@ -1503,6 +1510,13 @@ export const translations = {
     holdDuration: "Duración de Retención (segundos)",
     noBpmAvailable: "No hay BPM disponible. Analiza una pista de audio primero.",
     syncing: "Sincronizando...",
+    createReel: "Crear Reel",
+    useTemplateDescription: "Ingresa un título para tu nuevo reel. Las diapositivas se auto-poblarán desde la configuración de la plantilla.",
+    selectAll: "Seleccionar Todo",
+    selected: "Seleccionados",
+    total: "Total",
+    renderSelected: "Renderizar en Lote",
+    clearSelection: "Limpiar Selección",
 
     // Distribution
     distribution: "Distribución",

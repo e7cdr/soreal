@@ -11,6 +11,9 @@ import {
   Video,
   X,
   RefreshCw,
+  Check,
+  CheckSquare,
+  RotateCcw,
 } from "lucide-react";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
@@ -19,6 +22,7 @@ import {
   createReel,
   updateReel,
   deleteReel,
+  batchRenderReels,
 } from "@/lib/api";
 import ToolbarMenu from "@/app/components/ToolbarMenu";
 
@@ -62,6 +66,29 @@ export default function ReelLibraryPage() {
   const [aspectFilter, setAspectFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [selectedReels, setSelectedReels] = useState(new Set());
+  const [batchRendering, setBatchRendering] = useState(false);
+
+  const isSelected = (id) => selectedReels.has(id);
+  const toggleSelect = (id) => {
+    setSelectedReels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedReels.size === filteredReels.length && filteredReels.length > 0) {
+      setSelectedReels(new Set());
+    } else {
+      setSelectedReels(new Set(filteredReels.map((r) => r.id)));
+    }
+  };
+  const draftReels = reels.filter((r) => r.status === "draft");
+  const selectedDraftReels = [...selectedReels].filter(
+    (id) => draftReels.some((r) => r.id === id)
+  );
 
   const fetchReelsList = useCallback(async () => {
     setLoading(true);
@@ -138,6 +165,11 @@ export default function ReelLibraryPage() {
     setDeletingId(id);
     try {
       await deleteReel(id);
+      setSelectedReels((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await fetchReelsList();
     } catch (err) {
       setError(err.message || t("error"));
@@ -152,6 +184,20 @@ export default function ReelLibraryPage() {
       await fetchReelsList();
     } catch (err) {
       setError(err.message || t("error"));
+    }
+  };
+
+  const handleBatchRender = async () => {
+    if (selectedDraftReels.length === 0) return;
+    setBatchRendering(true);
+    try {
+      await batchRenderReels(selectedDraftReels);
+      setSelectedReels(new Set());
+      await fetchReelsList();
+    } catch (err) {
+      setError(err.message || t("error"));
+    } finally {
+      setBatchRendering(false);
     }
   };
 
@@ -189,10 +235,16 @@ export default function ReelLibraryPage() {
         {filteredReels.map((reel) => (
           <div
             key={reel.id}
-            className="flex items-start justify-between gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-surface)] hover:bg-[var(--surface-hover)] cursor-pointer transition group"
+            className="flex items-start justify-between gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-surface)] hover:bg-[var(--surface-hover)] transition group"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
+                <input
+                  type="checkbox"
+                  checked={isSelected(reel.id)}
+                  onChange={() => toggleSelect(reel.id)}
+                  className="rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)] mt-0.5"
+                />
                 <span
                   className={`text-xs font-semibold px-2 py-0.5 rounded ${STATUS_COLORS[reel.status]}`}
                 >
@@ -274,6 +326,9 @@ export default function ReelLibraryPage() {
     );
   };
 
+  const selectAllChecked =
+    filteredReels.length > 0 && selectedReels.size === filteredReels.length;
+
   return (
     <PageShell
       eyebrow={t("reelLibrary")}
@@ -285,6 +340,34 @@ export default function ReelLibraryPage() {
             <Calendar size={16} />
             {t("viewEstates")}
           </Link>
+          {selectedReels.size > 0 && selectedDraftReels.length > 0 && (
+            <button
+              type="button"
+              onClick={handleBatchRender}
+              disabled={batchRendering}
+              className="toolbar-button toolbar-button-primary disabled:opacity-50"
+            >
+              {batchRendering ? (
+                <RotateCcw size={14} className="animate-spin" />
+              ) : (
+                <Check size={14} />
+              )}
+              {selectedDraftReels.length === 1
+                ? t("renderSelected")
+                : `${t("renderSelected")} (${selectedDraftReels.length})`}
+            </button>
+          )}
+          {selectedReels.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedReels(new Set())}
+              className="toolbar-button text-[var(--text-muted)] hover:text-red-600"
+              title={t("clearSelection")}
+            >
+              <X size={14} />
+              {t("clearSelection")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -355,7 +438,26 @@ export default function ReelLibraryPage() {
         <div className="col-span-1 md:col-span-2 lg:col-span-2">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{t("reelLibrary")}</h2>
+              <div className="flex items-center gap-2">
+                {filteredReels.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectAllChecked}
+                      onChange={toggleSelectAll}
+                      className="rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+                    />
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {t("selectAll")}
+                    </span>
+                  </label>
+                )}
+                <span className="text-xs text-[var(--text-muted)] ml-2">
+                  {selectedReels.size > 0
+                    ? `${t("selected")}: ${selectedReels.size}`
+                    : `${t("total")}: ${filteredReels.length}`}
+                </span>
+              </div>
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (

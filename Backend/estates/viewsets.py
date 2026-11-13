@@ -2098,6 +2098,37 @@ class ReelViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["post"])
+    def batch_render(self, request):
+        """Mark multiple draft reels for batch rendering.
+
+        Body params:
+          - reel_ids (list[int]): IDs of reels to render
+        """
+        reel_ids = request.data.get("reel_ids", [])
+        if not isinstance(reel_ids, list) or not reel_ids:
+            return Response(
+                {"detail": "reel_ids must be a non-empty list of integers."},
+                status=400,
+            )
+
+        reels = Reel.objects.filter(id__in=reel_ids, status="draft")
+        if not reels.exists():
+            return Response(
+                {"detail": "No draft reels found matching the provided IDs."},
+                status=404,
+            )
+
+        updated = reels.update(status="rendering")
+        serializer = self.get_serializer(reels, many=True)
+        return Response(
+            {
+                "detail": f"Queued {updated} reel(s) for batch rendering",
+                "rendered": updated,
+                "reels": serializer.data,
+            }
+        )
+
 
 class ReelSlideViewSet(viewsets.ModelViewSet):
     """Staff-managed reel slides."""
@@ -2119,4 +2150,90 @@ class ReelTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return ReelTemplate.objects.all().order_by("name")
+
+    @action(detail=True, methods=["post"])
+    def use_template(self, request, pk=None):
+        """Create a new Reel from this template.
+
+        Body params:
+          - title (str): title for the new reel
+          - estate (int, optional): estate ID to auto-populate slides from
+          - audio_track (int, optional): audio track ID to link
+        """
+        from django.utils import timezone
+
+        try:
+            template = self.get_object()
+        except ReelTemplate.DoesNotExist:
+            return Response({"detail": "Template not found."}, status=404)
+
+        title = request.data.get("title") or f"{template.name} — {timezone.now().strftime('%Y-%m-%d')}"
+        estate_id = request.data.get("estate")
+        audio_track_id = request.data.get("audio_track")
+
+        estate = None
+        if estate_id:
+            try:
+                estate = Property.objects.get(id=estate_id)
+            except Property.DoesNotExist:
+                return Response({"detail": "Estate not found."}, status=404)
+
+        audio_track = None
+        if audio_track_id:
+            try:
+                audio_track = AudioTrack.objects.get(id=audio_track_id)
+            except AudioTrack.DoesNotExist:
+                return Response({"detail": "Audio track not found."}, status=404)
+
+        reel = Reel.objects.create(
+            title=title,
+            description=template.description or "",
+            estate=estate,
+            audio_track=audio_track,
+            bpm=template.bpm_min + (template.bpm_max - template.bpm_min) // 2
+            if template.bpm_min and template.bpm_max
+            else None,
+            aspect_ratio="9:16",
+            status="draft",
+            created_by=request.user.username if request.user.is_authenticated else "",
+        )
+
+        # Auto-populate slides from template config + estate images
+        estate_images = list(estate.images.all()) if estate else []
+        slide_count = template.slide_count or 5
+        transition_style = template.transition_style or "fade"
+
+        created = []
+        for i in range(slide_count):
+            image = estate_images[i].id if i < len(estate_images) else None
+            slide = ReelSlide.objects.create(
+                reel=reel,
+                image=image,
+                duration_seconds=3.0,
+                transition_type=transition_style,
+                transition_duration=0.5,
+                text_overlay="",
+                text_position="center",
+                text_font_scale=1.0,
+                text_font_family="sans-serif",
+                text_color="white",
+                text_background=True,
+                text_background_opacity=0.6,
+                text_animation="fade-in",
+                text_animation_duration=0.5,
+                text_shadow=True,
+                lower_third=False,
+                beat_offset=i,
+                order=i,
+            )
+            created.append(slide.id)
+
+        serializer = ReelSerializer(reel)
+        return Response(
+            {
+                "detail": f"Created reel from template '{template.name}' with {len(created)} slides",
+                "reel": serializer.data,
+                "slides": created,
+            }
+        )
 

@@ -8,16 +8,24 @@ import {
   X,
   Play,
   LayoutList,
+  Plus,
 } from "lucide-react";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
-import { fetchReelTemplates } from "@/lib/api";
+import {
+  fetchReelTemplates,
+  createReelFromTemplate,
+} from "@/lib/api";
 
 export default function ReelTemplatesPage() {
   const { translate: t } = useTranslation();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [openUseDialog, setOpenUseDialog] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [useForm, setUseForm] = useState({ title: "" });
+  const [saving, setSaving] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
@@ -37,6 +45,31 @@ export default function ReelTemplatesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTemplates();
   }, [fetchTemplates]);
+
+  const handleUseTemplate = async (templateId) => {
+    setSelectedTemplateId(templateId);
+    setUseForm({ title: "" });
+    setOpenUseDialog(true);
+  };
+
+  const handleSubmitUse = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const result = await createReelFromTemplate(selectedTemplateId, {
+        title: useForm.title || undefined,
+      });
+      setOpenUseDialog(false);
+      setSaving(false);
+      // Navigate to the new reel's edit page
+      window.location.href = `/media/reels/${result.reel.id}/edit`;
+    } catch (err) {
+      setError(err.message || t("error"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -119,6 +152,7 @@ export default function ReelTemplatesPage() {
               <div className="flex items-center gap-2 ml-2">
                 <button
                   type="button"
+                  onClick={() => handleUseTemplate(template.id)}
                   className="p-1.5 text-[var(--text-muted)] hover:text-[var(--green)]"
                   title={t("useTemplate")}
                 >
@@ -127,6 +161,63 @@ export default function ReelTemplatesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Use Template dialog */}
+      {openUseDialog && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+          <form
+            onSubmit={handleSubmitUse}
+            className="my-4 grid w-full max-w-md gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">{t("useTemplate")}</h2>
+              <button
+                type="button"
+                onClick={() => setOpenUseDialog(false)}
+                className="toolbar-button"
+              >
+                <X size={16} />
+                {t("close")}
+              </button>
+            </div>
+
+            <label className="col-span-2">
+              <span className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                {t("reelTitle")}
+              </span>
+              <input
+                type="text"
+                name="title"
+                value={useForm.title}
+                onChange={(event) => setUseForm({ ...useForm, title: event.target.value })}
+                placeholder={t("reelTitlePlaceholder")}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
+              />
+            </label>
+
+            <p className="text-xs text-[var(--text-muted)] col-span-2">
+              {t("useTemplateDescription")}
+            </p>
+
+            <div className="col-span-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenUseDialog(false)}
+                className="toolbar-button"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="toolbar-button toolbar-button-primary disabled:opacity-50"
+              >
+                {saving ? t("saving") : t("createReel")}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </PageShell>
