@@ -128,6 +128,8 @@ export default function EstateDetailClient({ estate }) {
         bedrooms: estateDraft.bedrooms === "" ? null : Number(estateDraft.bedrooms),
         bathrooms: estateDraft.bathrooms === "" ? null : Number(estateDraft.bathrooms),
         area_sqm: estateDraft.area_sqm === "" ? null : Number(estateDraft.area_sqm),
+        latitude: estateDraft.latitude === "" ? null : Number(estateDraft.latitude),
+        longitude: estateDraft.longitude === "" ? null : Number(estateDraft.longitude),
         broker: estateDraft.broker ? Number(estateDraft.broker) : null,
         owner: estateDraft.owner ? Number(estateDraft.owner) : null,
       });
@@ -303,6 +305,8 @@ export default function EstateDetailClient({ estate }) {
                 ["address", t("address"), "text"],
                 ["province", t("province"), "province"],
                 ["city", t("city"), "city"],
+                ["latitude", t("latitude"), "latitude"],
+                ["longitude", t("longitude"), "longitude"],
                 ["persona_name", t("personaName"), "text"],
                 ["persona_demographics", t("personaDemographics"), "text"],
                 ["persona_motivations", t("personaMotivations"), "textarea"],
@@ -335,6 +339,14 @@ export default function EstateDetailClient({ estate }) {
                         {estateDraft[field] && !options.some((option) => String(option.value) === String(estateDraft[field])) && <option value={estateDraft[field]}>{estateDraft[field]}</option>}
                         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                       </select>
+                    ) : ["latitude", "longitude"].includes(type) ? (
+                      <input
+                        type="number"
+                        step="any"
+                        value={estateDraft[field]}
+                        onChange={(event) => setEstateDraft({ ...estateDraft, [field]: event.target.value })}
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[var(--foreground)]"
+                      />
                     ) : type === "textarea" ? (
                       <textarea
                         rows={3}

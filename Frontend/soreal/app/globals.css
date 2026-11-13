@@ -92,7 +92,7 @@ textarea:focus-visible {
 
 .app-header {
   position: sticky;
-  z-index: 40;
+  z-index: 999;
   top: 0;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
