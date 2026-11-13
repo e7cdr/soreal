@@ -65,6 +65,30 @@ function buildDraft(estate) {
   };
 }
 
+function siteOrigin() {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
+
+function isLocalOrigin(origin) {
+  try {
+    const host = new URL(origin).hostname;
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host === "0.0.0.0" ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function EstateDetailClient({ estate }) {
   const { translate: t } = useTranslation();
 
@@ -74,6 +98,7 @@ export default function EstateDetailClient({ estate }) {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const [draft, setDraft] = useState(null);
   const [brokers, setBrokers] = useState([]);
@@ -193,12 +218,28 @@ export default function EstateDetailClient({ estate }) {
   }
 
   function shareOnFacebook() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      "_blank",
-      "width=600,height=400",
+    setNotice(null);
+    const origin = siteOrigin();
+    const shareUrl = `${origin}/estates/${estate.slug}`;
+    const sharerUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+      shareUrl,
+    )}&display=popup`;
+
+    const popup = window.open(
+      sharerUrl,
+      "soreal-facebook-share",
+      "width=640,height=640,menubar=no,toolbar=no,resizable=yes,scrollbars=yes",
     );
+
+    if (!popup) {
+      navigator.clipboard?.writeText(shareUrl).catch(() => {});
+      setNotice(t("sharePopupBlocked"));
+      return;
+    }
+
+    if (isLocalOrigin(origin)) {
+      setNotice(t("shareLocalhostHint"));
+    }
   }
 
   const hasCoordinates =
@@ -304,6 +345,12 @@ export default function EstateDetailClient({ estate }) {
       {error && (
         <p role="alert" className="estate-form-error">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p role="status" className="estate-share-notice">
+          {notice}
         </p>
       )}
 

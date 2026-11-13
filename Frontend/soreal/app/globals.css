@@ -1800,6 +1800,21 @@ textarea::placeholder {
   padding: 8px 10px;
 }
 
+.estate-share-notice {
+  margin: 0 0 10px;
+  border: 1px solid rgb(217 119 6 / 35%);
+  border-radius: 9px;
+  background: rgb(217 119 6 / 12%);
+  color: #b45309;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+[data-theme="dark"] .estate-share-notice {
+  color: #fbbf24;
+}
+
 .estate-inquiry-success {
   display: flex;
   align-items: flex-start;

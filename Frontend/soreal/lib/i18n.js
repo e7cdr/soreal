@@ -332,6 +332,10 @@ export const translations = {
     whatsappContactRequest: "I saw your request for {{type}} in {{location}}",
     shareFacebook: "Share on Facebook",
     shareFacebookTitle: "Check out this property on SOREAL",
+    sharePopupBlocked:
+      "Your browser blocked the share window. The listing link was copied to your clipboard.",
+    shareLocalhostHint:
+      "Facebook cannot preview local links. Set NEXT_PUBLIC_SITE_URL to a public URL to show the title and image in the share card.",
     viewOriginal: "View original listing",
     fromSource: "Source: {{site}}",
     seoTitle: "SEO Title",
@@ -1211,6 +1215,10 @@ export const translations = {
     whatsappContactRequest: "Vi tu solicitud de {{type}} en {{location}}",
     shareFacebook: "Compartir en Facebook",
     shareFacebookTitle: "Mira esta propiedad en SOREAL",
+    sharePopupBlocked:
+      "Tu navegador bloqueó la ventana para compartir. El enlace de la propiedad se copió al portapapeles.",
+    shareLocalhostHint:
+      "Facebook no puede previsualizar enlaces locales. Configura NEXT_PUBLIC_SITE_URL con una URL pública para mostrar el título y la imagen en la tarjeta.",
     viewOriginal: "Ver listado original",
     fromSource: "Fuente: {{site}}",
     seoTitle: "Título SEO",
