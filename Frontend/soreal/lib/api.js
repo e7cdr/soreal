@@ -627,3 +627,98 @@ export async function deleteAdCampaign(campaignId) {
     method: "DELETE",
   });
 }
+
+// Audio tracks
+export async function fetchAudioTracks(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.append("page", params.page);
+  if (params.status) searchParams.append("status", params.status);
+  return apiFetch(`/api/estates/audio-tracks/?${searchParams.toString()}`);
+}
+
+export async function createAudioTrack(data) {
+  return apiFetch("/api/estates/audio-tracks/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateAudioTrack(trackId, data) {
+  return apiFetch(`/api/estates/audio-tracks/${trackId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAudioTrack(trackId) {
+  return apiFetch(`/api/estates/audio-tracks/${trackId}/`, {
+    method: "DELETE",
+  });
+}
+
+// Reels
+export async function fetchReels(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.append("page", params.page);
+  if (params.status) searchParams.append("status", params.status);
+  if (params.aspect_ratio) searchParams.append("aspect_ratio", params.aspect_ratio);
+  return apiFetch(`/api/estates/reels/?${searchParams.toString()}`);
+}
+
+export async function fetchReel(reelId) {
+  return apiFetch(`/api/estates/reels/${reelId}/`);
+}
+
+export async function createReel(data) {
+  return apiFetch("/api/estates/reels/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateReel(reelId, data) {
+  return apiFetch(`/api/estates/reels/${reelId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteReel(reelId) {
+  return apiFetch(`/api/estates/reels/${reelId}/`, {
+    method: "DELETE",
+  });
+}
+
+// Reel slides
+export async function fetchReelSlides(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.reel) searchParams.append("reel", params.reel);
+  return apiFetch(`/api/estates/reel-slides/?${searchParams.toString()}`);
+}
+
+export async function createReelSlide(data) {
+  return apiFetch("/api/estates/reel-slides/", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateReelSlide(slideId, data) {
+  return apiFetch(`/api/estates/reel-slides/${slideId}/`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteReelSlide(slideId) {
+  return apiFetch(`/api/estates/reel-slides/${slideId}/`, {
+    method: "DELETE",
+  });
+}
+
+// Reel templates
+export async function fetchReelTemplates(params = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.append("page", params.page);
+  return apiFetch(`/api/estates/reel-templates/?${searchParams.toString()}`);
+}

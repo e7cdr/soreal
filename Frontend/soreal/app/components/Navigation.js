@@ -20,8 +20,10 @@ import {
   ListChecks,
   Menu,
   Moon,
+  Play,
   Sun,
   Users,
+  Video,
   X,
 } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
@@ -89,6 +91,9 @@ export default function Navigation() {
     { href: "/whatsapp-import", label: "whatsappImport", icon: FilePlus2 },
     { href: "/about", label: "about", icon: CircleHelp },
     { href: "/account", label: "account", icon: Users },
+    { href: "/media/reels", label: "reelLibrary", icon: Video },
+    { href: "/media/audio", label: "audioTracks", icon: Play },
+    { href: "/media/templates", label: "reelTemplates", icon: FileText },
   ];
 
   const isActive = (href) =>
