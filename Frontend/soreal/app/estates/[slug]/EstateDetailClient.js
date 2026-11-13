@@ -93,6 +93,8 @@ export default function EstateDetailClient({ estate }) {
       city: estate.city || "",
       province: estate.province || "",
       status: estate.status || "draft",
+      latitude: estate.latitude ?? "",
+      longitude: estate.longitude ?? "",
       broker: estate.broker || "",
       owner: estate.owner || "",
       persona_name: estate.persona_name || "",

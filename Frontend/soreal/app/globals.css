@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* Leaflet attribution control should not block the navigation menu */
+.leaflet-control-attribution {
+  z-index: 1 !important;
+}
+
 :root {
   color-scheme: light;
   --background: #f5f8f5;
