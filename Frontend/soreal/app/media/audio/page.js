@@ -19,6 +19,7 @@ import {
   createAudioTrack,
   updateAudioTrack,
   deleteAudioTrack,
+  analyzeAudioTrack,
 } from "@/lib/api";
 
 const STATUS_LABELS = {
@@ -48,6 +49,7 @@ export default function AudioTracksPage() {
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [analyzingIds, setAnalyzingIds] = useState([]);
 
   const fetchTracks = useCallback(async () => {
     setLoading(true);
@@ -115,11 +117,14 @@ export default function AudioTracksPage() {
   };
 
   const handleAnalyze = async (id) => {
+    setAnalyzingIds((ids) => [...ids, id]);
     try {
-      await updateAudioTrack(id, { status: "analyzing" });
+      await analyzeAudioTrack(id);
       await fetchTracks();
     } catch (err) {
       setError(err.message || t("error"));
+    } finally {
+      setAnalyzingIds((ids) => ids.filter((i) => i !== id));
     }
   };
 
@@ -214,7 +219,7 @@ export default function AudioTracksPage() {
                       )}
                       <div className="mt-2 flex items-center gap-3 text-xs text-[var(--text-muted)]">
                         <span>{formatDuration(track.duration_seconds)}</span>
-                        {track.bpm && <span>· {track.bpm} BPM</span>}
+                        {track.bpm && <span>· {track.bpm} {t("bpm")}</span>}
                         {track.key && <span>· {t("key")}: {track.key}</span>}
                       </div>
                       {track.waveform_peaks && track.waveform_peaks.length > 0 && (
@@ -237,23 +242,43 @@ export default function AudioTracksPage() {
                             e.stopPropagation();
                             handleAnalyze(track.id);
                           }}
-                          className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                          disabled={analyzingIds.includes(track.id)}
+                          className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 disabled:opacity-50"
                           title={t("analyzeAudio")}
                         >
-                          <Play size={14} />
+                          {analyzingIds.includes(track.id) ? (
+                            <RefreshCw size={12} className="animate-spin" />
+                          ) : (
+                            <Play size={14} />
+                          )}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(track);
-                        }}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--green)]"
-                        title={t("edit")}
-                      >
-                        <Edit3 size={14} />
-                      </button>
+                      {track.status === "analyzed" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(track);
+                          }}
+                          className="p-1.5 text-[var(--text-muted)] hover:text-[var(--green)]"
+                          title={t("edit")}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      )}
+                      {track.status !== "analyzed" && track.status !== "uploaded" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(track);
+                          }}
+                          className="p-1.5 text-[var(--text-muted)] hover:text-[var(--green)]"
+                          title={t("edit")}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => {

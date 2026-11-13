@@ -18,6 +18,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
+from .audio_analysis import analyze
 from .models import (
     AdCampaign,
     AudioTrack,
@@ -1911,6 +1912,35 @@ class AudioTrackViewSet(viewsets.ModelViewSet):
             return AudioTrack.objects.none()
         return AudioTrack.objects.all().order_by("-created_at")
 
+    @action(detail=True, methods=["post"])
+    def analyze(self, request, pk=None):
+        """Run MixMate-style audio analysis on this track."""
+        try:
+            track = self.get_object()
+        except AudioTrack.DoesNotExist:
+            return Response({"detail": "Audio track not found."}, status=404)
+
+        if not track.file:
+            return Response({"detail": "Audio track has no file."}, status=400)
+
+        try:
+            track.file.open("rb")
+            result = analyze(track.file, track.file.name)
+            track.file.close()
+        except Exception as exc:
+            return Response({"detail": f"Analysis failed: {exc}"}, status=500)
+
+        track.bpm = result.get("bpm")
+        track.key = result.get("key")
+        track.duration_seconds = result.get("duration_seconds")
+        track.waveform_peaks = result.get("waveform", [])
+        track.spectral_bands = result.get("bands", [])
+        track.sections = result.get("timeline", [])
+        track.save()
+
+        serializer = self.get_serializer(track)
+        return Response(serializer.data)
+
 
 class ReelViewSet(viewsets.ModelViewSet):
     """Staff-managed reel projects."""
@@ -1922,6 +1952,101 @@ class ReelViewSet(viewsets.ModelViewSet):
         if not _is_staff(self.request):
             return Reel.objects.none()
         return Reel.objects.all().order_by("-created_at")
+
+    @action(detail=True, methods=["post"])
+    def beat_sync_slides(self, request, pk=None):
+        """Auto-generate slides synced to the reel's audio BPM.
+
+        Body params:
+          - clear_existing (bool): delete all existing slides first (default true)
+          - beats_per_slide (int): how many beats each slide spans (default 1)
+          - slide_duration (float): override duration in seconds (default auto from BPM)
+          - transition_type (str): default "fade"
+          - text_position (str): default "center"
+        """
+        try:
+            reel = self.get_object()
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=404)
+
+        clear_existing = request.data.get("clear_existing", True)
+        beats_per_slide = int(request.data.get("beats_per_slide", 1))
+        override_duration = request.data.get("slide_duration")
+        transition_type = request.data.get("transition_type", "fade")
+        text_position = request.data.get("text_position", "center")
+
+        if clear_existing:
+            reel.slides.all().delete()
+
+        bpm = reel.bpm
+        if not bpm:
+            if reel.audio_track and reel.audio_track.bpm:
+                bpm = reel.audio_track.bpm
+            else:
+                return Response(
+                    {"detail": "No BPM available. Analyze an audio track first."},
+                    status=400,
+                )
+
+        seconds_per_beat = 60.0 / float(bpm)
+        if override_duration:
+            slide_duration = float(override_duration)
+        else:
+            slide_duration = seconds_per_beat * beats_per_slide
+
+        # Use estate images if available
+        estate_images = []
+        if reel.estate:
+            estate_images = list(reel.estate.images.all())
+
+        num_slides = max(1, int(round(reel.duration_seconds or 15) / slide_duration))
+        if not reel.duration_seconds:
+            num_slides = 5  # fallback
+
+        created = []
+        for i in range(num_slides):
+            image = None
+            image_url = None
+            if i < len(estate_images):
+                image = estate_images[i].id
+            else:
+                # Use a placeholder from the estate's cover image
+                pass
+
+            slide = ReelSlide.objects.create(
+                reel=reel,
+                image=image,
+                image_url=image_url,
+                duration_seconds=slide_duration,
+                transition_type=transition_type,
+                transition_duration=min(0.5, slide_duration / 3),
+                text_overlay="",
+                text_position=text_position,
+                text_font_scale=1.0,
+                text_font_family="sans-serif",
+                text_color="white",
+                text_background=True,
+                text_background_opacity=0.6,
+                text_animation="fade-in",
+                text_animation_duration=0.5,
+                text_shadow=True,
+                lower_third=False,
+                beat_offset=i * beats_per_slide,
+                order=i,
+            )
+            created.append(slide.id)
+
+        serializer = self.get_serializer(reel)
+        return Response(
+            {
+                "detail": f"Created {len(created)} beat-synced slides",
+                "bpm": bpm,
+                "seconds_per_beat": round(seconds_per_beat, 3),
+                "slide_duration": slide_duration,
+                "slides": created,
+                "reel": serializer.data,
+            }
+        )
 
 
 class ReelSlideViewSet(viewsets.ModelViewSet):

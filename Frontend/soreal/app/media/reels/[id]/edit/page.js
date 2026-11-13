@@ -27,6 +27,7 @@ import {
   createReelSlide,
   updateReelSlide,
   deleteReelSlide,
+  beatSyncSlides,
 } from "@/lib/api";
 
 const TRANSITION_LABELS = {
@@ -156,6 +157,7 @@ export default function ReelEditPage({ params }) {
   });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [beatSyncing, setBeatSyncing] = useState(false);
 
   const fetchReelDetail = useCallback(async () => {
     setLoading(true);
@@ -283,6 +285,28 @@ export default function ReelEditPage({ params }) {
     }
   };
 
+  const handleBeatSync = async () => {
+    if (!reel?.bpm && !(reel?.audio_track?.bpm)) {
+      // eslint-disable-next-line no-alert
+      alert(t("noBpmAvailable"));
+      return;
+    }
+    setBeatSyncing(true);
+    try {
+      await beatSyncSlides(reelId, {
+        clear_existing: true,
+        beats_per_slide: 1,
+        transition_type: "fade",
+        text_position: "center",
+      });
+      await fetchReelDetail();
+    } catch (err) {
+      setError(err.message || t("error"));
+    } finally {
+      setBeatSyncing(false);
+    }
+  };
+
   const handleMoveUp = (index) => {
     if (index === 0) return;
     const newSlides = [...slides];
@@ -402,6 +426,27 @@ export default function ReelEditPage({ params }) {
             <Plus size={16} />
             {t("addSlide")}
           </button>
+          {reel?.audio_track || reel?.bpm ? (
+            <button
+              type="button"
+              onClick={handleBeatSync}
+              disabled={beatSyncing}
+              className="toolbar-button toolbar-button-primary disabled:opacity-50"
+            >
+              <RotateCcw size={16} />
+              {beatSyncing ? t("syncing") : t("beatSync")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="toolbar-button opacity-50 cursor-not-allowed"
+              title={t("noBpmAvailable")}
+            >
+              <RotateCcw size={16} />
+              {t("beatSync")}
+            </button>
+          )}
         </>
       }
     >

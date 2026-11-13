@@ -656,6 +656,12 @@ export async function deleteAudioTrack(trackId) {
   });
 }
 
+export async function analyzeAudioTrack(trackId) {
+  return apiFetch(`/api/estates/audio-tracks/${trackId}/analyze/`, {
+    method: "POST",
+  });
+}
+
 // Reels
 export async function fetchReels(params = {}) {
   const searchParams = new URLSearchParams();
@@ -686,6 +692,13 @@ export async function updateReel(reelId, data) {
 export async function deleteReel(reelId) {
   return apiFetch(`/api/estates/reels/${reelId}/`, {
     method: "DELETE",
+  });
+}
+
+export async function beatSyncSlides(reelId, data = {}) {
+  return apiFetch(`/api/estates/reels/${reelId}/beat_sync_slides/`, {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
 

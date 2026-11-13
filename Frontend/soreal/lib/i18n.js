@@ -644,6 +644,8 @@ export const translations = {
     entryAnimation: "Entry Animation",
     exitAnimation: "Exit Animation",
     holdDuration: "Hold Duration (seconds)",
+    noBpmAvailable: "No BPM available. Analyze an audio track first.",
+    syncing: "Syncing...",
 
     // Blacklist
     listaNegra: "Lista Negra",
@@ -1479,6 +1481,8 @@ export const translations = {
     entryAnimation: "Animación de Entrada",
     exitAnimation: "Animación de Salida",
     holdDuration: "Duración de Retención (segundos)",
+    noBpmAvailable: "No hay BPM disponible. Analiza una pista de audio primero.",
+    syncing: "Sincronizando...",
 
     // Blacklist
     listaNegra: "Lista Negra",

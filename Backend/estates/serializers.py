@@ -681,6 +681,9 @@ class ReelSerializer(serializers.ModelSerializer):
     audio_track_title = serializers.CharField(
         source="audio_track.title", read_only=True, allow_null=True
     )
+    audio_track_key = serializers.CharField(
+        source="audio_track.key", read_only=True, allow_null=True
+    )
     slides = ReelSlideSerializer(many=True, read_only=True)
 
     class Meta:
@@ -694,6 +697,7 @@ class ReelSerializer(serializers.ModelSerializer):
             "estate_slug",
             "audio_track",
             "audio_track_title",
+            "audio_track_key",
             "bpm",
             "aspect_ratio",
             "duration_seconds",
