@@ -91,3 +91,29 @@ def health_check(request):
         content_type="application/json",
         status=200 if db_ok else 503,
     )
+
+
+@csrf_exempt
+def models_list(request):
+    """OpenAI-compatible /v1/models endpoint.
+
+    Returns a list of available models for LLM clients that expect
+    an OpenAI-compatible API base URL pointing at this server.
+    """
+    import json
+
+    payload = {
+        "object": "list",
+        "data": [
+            {
+                "id": "soreal-real-estate",
+                "object": "model",
+                "owned_by": "soreal",
+            }
+        ],
+    }
+    return HttpResponse(
+        json.dumps(payload),
+        content_type="application/json",
+        status=200,
+    )

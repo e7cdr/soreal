@@ -20,6 +20,8 @@ urlpatterns = [
     path("sitemap.xml", estate_views.sitemap_xml, name="sitemap_xml"),
     path("health", estate_views.health_check, name="health_check"),
     path("health/", estate_views.health_check, name="health_check_slash"),
+    path("v1/models", estate_views.models_list, name="models_list"),
+    path("v1/models/", estate_views.models_list, name="models_list_slash"),
 ]
 
 
