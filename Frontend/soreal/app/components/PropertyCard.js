@@ -25,7 +25,7 @@ function buildWhatsAppUrl(phone, text) {
   return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
 }
 
-export default function PropertyCard({ property }) {
+export default function PropertyCard({ property, selected = false, onToggleSelected }) {
   const { translate: t } = useTranslation();
   const [isFav, setIsFav] = useState(false);
   const coverImage =
@@ -52,7 +52,21 @@ export default function PropertyCard({ property }) {
   };
 
   return (
-    <article className="border rounded-lg p-4 hover:shadow-md transition relative">
+    <article
+      className={`border rounded-lg p-4 hover:shadow-md transition relative ${
+        selected ? "property-card-selected" : ""
+      }`.trim()}
+    >
+      {onToggleSelected && (
+        <label className="property-card-check" title={t("selectEstate", { title: property.title })}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelected(property.id)}
+            aria-label={t("selectEstate", { title: property.title })}
+          />
+        </label>
+      )}
       <button
         onClick={(e) => {
           e.preventDefault();

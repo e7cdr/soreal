@@ -6,8 +6,10 @@ import dynamic from "next/dynamic";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Copy,
   Download,
   ExternalLink,
+  FileText,
   Heart,
   MapPin,
   Pencil,
@@ -28,6 +30,8 @@ import {
   removeFavorite,
 } from "@/lib/favorites";
 import { renderTemplate } from "@/lib/storytelling-templates";
+import { buildEstateCopyText } from "@/lib/estate-copy";
+import { copyToClipboard } from "@/lib/clipboard";
 import EstateGallery from "./EstateGallery";
 import EstateContactCard from "./EstateContactCard";
 import EstateInquiryForm from "./EstateInquiryForm";
@@ -114,6 +118,12 @@ export default function EstateDetailClient({ estate }) {
     setIsFav(isFavorite(estate.id));
     setCanManage(Boolean(localStorage.getItem("auth_token")));
   }, [estate.id]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
   const ensureEditData = useCallback(() => {
     setDraft((current) => current ?? buildDraft(estate));
@@ -232,14 +242,23 @@ export default function EstateDetailClient({ estate }) {
     );
 
     if (!popup) {
-      navigator.clipboard?.writeText(shareUrl).catch(() => {});
-      setNotice(t("sharePopupBlocked"));
+      copyToClipboard(shareUrl);
+      setNotice({ tone: "warning", message: t("sharePopupBlocked") });
       return;
     }
 
     if (isLocalOrigin(origin)) {
-      setNotice(t("shareLocalhostHint"));
+      setNotice({ tone: "warning", message: t("shareLocalhostHint") });
     }
+  }
+
+  async function copyEstateInfo() {
+    const copied = await copyToClipboard(buildEstateCopyText(estate));
+    setNotice(
+      copied
+        ? { tone: "success", message: t("estateCopied") }
+        : { tone: "warning", message: t("copyFailed") },
+    );
   }
 
   const hasCoordinates =
@@ -248,6 +267,7 @@ export default function EstateDetailClient({ estate }) {
     estate.longitude !== null &&
     estate.longitude !== undefined;
   const locationLabel = [estate.city, estate.province].filter(Boolean).join(", ");
+  const descriptionHasHtml = /<\/?[a-z][^>]*>/i.test(estate.description || "");
 
   return (
     <PageShell
@@ -316,6 +336,16 @@ export default function EstateDetailClient({ estate }) {
             <Share2 size={16} aria-hidden="true" />
           </button>
 
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={copyEstateInfo}
+            aria-label={t("copyEstateInfo")}
+            title={t("copyEstateInfo")}
+          >
+            <Copy size={16} aria-hidden="true" />
+          </button>
+
           <ToolbarMenu label={t("moreActions")}>
             <button
               type="button"
@@ -349,8 +379,8 @@ export default function EstateDetailClient({ estate }) {
       )}
 
       {notice && (
-        <p role="status" className="estate-share-notice">
-          {notice}
+        <p role="status" className={`estate-notice estate-notice-${notice.tone}`}>
+          {notice.message}
         </p>
       )}
 
@@ -436,15 +466,23 @@ export default function EstateDetailClient({ estate }) {
           )}
 
           <section className="estate-card estate-description-card">
-            <h2 className="estate-section-title">{t("description")}</h2>
+            <div className="estate-section-head">
+              <FileText size={14} aria-hidden="true" />
+              <h2 className="estate-section-title">{t("aboutProperty")}</h2>
+            </div>
             {estate.description ? (
               <>
                 <div
                   className={`estate-description ${
-                    descriptionExpanded ? "" : "estate-description-clamped"
-                  }`.trim()}
-                  dangerouslySetInnerHTML={{ __html: estate.description }}
-                />
+                    descriptionHasHtml ? "estate-rich-text" : "estate-description-text"
+                  } ${descriptionExpanded ? "" : "estate-description-clamped"}`.trim()}
+                >
+                  {descriptionHasHtml ? (
+                    <div dangerouslySetInnerHTML={{ __html: estate.description }} />
+                  ) : (
+                    <p>{estate.description}</p>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="estate-link-button"

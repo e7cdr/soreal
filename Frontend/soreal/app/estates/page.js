@@ -9,7 +9,10 @@ import dynamic from "next/dynamic";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
 import FilterPopover from "@/app/components/FilterPopover";
-import { Search } from "lucide-react";
+import ToolbarMenu from "@/app/components/ToolbarMenu";
+import { Copy, Search } from "lucide-react";
+import { buildEstatesCopyText } from "@/lib/estate-copy";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const PropertyMap = dynamic(
   () => import("@/app/components/PropertyMap").then((mod) => mod.default),
@@ -39,6 +42,15 @@ export default function EstatesPage() {
   const [searchName, setSearchName] = useState("");
   const [searchEmail, setSearchEmail] = useState("");
   const [savingSearch, setSavingSearch] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [copying, setCopying] = useState(false);
+  const [copyStatus, setCopyStatus] = useState(null);
+
+  useEffect(() => {
+    if (!copyStatus) return undefined;
+    const timer = window.setTimeout(() => setCopyStatus(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [copyStatus]);
 
   useEffect(() => {
     loadProperties();
@@ -50,6 +62,7 @@ export default function EstatesPage() {
 
   async function loadProperties() {
     setLoading(true);
+    setSelectedIds([]);
     try {
       const data = await fetchEstates({ ...filters, page });
       setProperties(data.results || []);
@@ -117,6 +130,56 @@ export default function EstatesPage() {
     setPage(1);
   };
 
+  function toggleSelected(id) {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
+  }
+
+  function toggleSelectAll() {
+    const pageIds = properties.map((property) => property.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+    setSelectedIds((current) =>
+      allSelected
+        ? current.filter((id) => !pageIds.includes(id))
+        : Array.from(new Set([...current, ...pageIds])),
+    );
+  }
+
+  async function copySelected() {
+    const selected = properties.filter((property) => selectedIds.includes(property.id));
+    if (!selected.length) return;
+    const copied = await copyToClipboard(buildEstatesCopyText(selected));
+    setCopyStatus(
+      copied
+        ? t("bulkCopied", { count: selected.length })
+        : t("copyFailed"),
+    );
+  }
+
+  async function copyAllFiltered() {
+    setCopying(true);
+    setCopyStatus(null);
+    try {
+      const first = await fetchEstates({ ...filters, page: 1 });
+      const all = [...(first.results || [])];
+      const pageSize = first.results?.length || 20;
+      const pages = Math.ceil((first.count || 0) / pageSize);
+      for (let nextPage = 2; nextPage <= pages; nextPage += 1) {
+        const data = await fetchEstates({ ...filters, page: nextPage });
+        all.push(...(data.results || []));
+      }
+      const copied = await copyToClipboard(buildEstatesCopyText(all));
+      setCopyStatus(
+        copied ? t("bulkCopied", { count: all.length }) : t("copyFailed"),
+      );
+    } catch (copyError) {
+      setCopyStatus(copyError.message || t("copyFailed"));
+    } finally {
+      setCopying(false);
+    }
+  }
+
   if (loading) {
     return (
       <PageShell title={t("estatesTitle")}>
@@ -133,6 +196,9 @@ export default function EstatesPage() {
   }
 
   const activeFilters = Object.values(filters).filter(Boolean).length;
+  const allPageSelected =
+    properties.length > 0 &&
+    properties.every((property) => selectedIds.includes(property.id));
 
   return (
     <PageShell
@@ -309,6 +375,54 @@ export default function EstatesPage() {
             </FilterPopover>
           )}
 
+          {properties.length > 0 && (
+            <>
+              <label className="toolbar-check">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleSelectAll}
+                />
+                <span>{t("selectAll")}</span>
+              </label>
+
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  className="toolbar-button toolbar-button-primary"
+                  onClick={copySelected}
+                  disabled={copying}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  {t("copySelected", { count: selectedIds.length })}
+                </button>
+              )}
+
+              <ToolbarMenu label={t("bulkActions")}>
+                <button
+                  type="button"
+                  className="toolbar-menu-item"
+                  onClick={copyAllFiltered}
+                  disabled={copying}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                  {copying ? t("loading") : t("copyAllFiltered", { count })}
+                </button>
+                {selectedIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="toolbar-menu-item"
+                    onClick={() => setSelectedIds([])}
+                  >
+                    {t("clearSelection")}
+                  </button>
+                )}
+              </ToolbarMenu>
+            </>
+          )}
+
+          {copyStatus && <span className="estate-copy-status">{copyStatus}</span>}
+
           <span className="page-toolbar-spacer" />
           <span className="page-toolbar-label">{count} {t("propertiesFound")}</span>
         </>
@@ -331,7 +445,12 @@ export default function EstatesPage() {
           />
         ) : (
           properties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
+            <PropertyCard
+              key={property.id}
+              property={property}
+              selected={selectedIds.includes(property.id)}
+              onToggleSelected={toggleSelected}
+            />
           ))
         )}
       </div>

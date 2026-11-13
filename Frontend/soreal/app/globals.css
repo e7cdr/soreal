@@ -699,6 +699,72 @@ textarea::placeholder {
   opacity: 0.45;
 }
 
+.toolbar-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.toolbar-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.estate-copy-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgb(22 163 74 / 12%);
+  color: #15803d;
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .estate-copy-status {
+  background: rgb(74 222 128 / 14%);
+  color: #4ade80;
+}
+
+/* Property card selection */
+.property-card-check {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  padding: 4px;
+}
+
+[data-theme="dark"] .property-card-check {
+  background: rgb(30 41 59 / 92%);
+}
+
+.property-card-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.property-card-selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px rgb(22 163 74 / 22%);
+}
+
 .toolbar-tabs {
   display: inline-flex;
   max-width: 100%;
@@ -1602,6 +1668,19 @@ textarea::placeholder {
   padding: 14px 16px;
 }
 
+.estate-section-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  color: var(--green);
+}
+
+.estate-section-head .estate-section-title {
+  margin: 0;
+  color: var(--text-muted);
+}
+
 .estate-section-title {
   margin: 0 0 8px;
   color: var(--text-muted);
@@ -1800,7 +1879,7 @@ textarea::placeholder {
   padding: 8px 10px;
 }
 
-.estate-share-notice {
+.estate-notice {
   margin: 0 0 10px;
   border: 1px solid rgb(217 119 6 / 35%);
   border-radius: 9px;
@@ -1811,8 +1890,18 @@ textarea::placeholder {
   padding: 8px 10px;
 }
 
-[data-theme="dark"] .estate-share-notice {
+.estate-notice-success {
+  border-color: rgb(22 163 74 / 35%);
+  background: rgb(22 163 74 / 12%);
+  color: #15803d;
+}
+
+[data-theme="dark"] .estate-notice-warning {
   color: #fbbf24;
+}
+
+[data-theme="dark"] .estate-notice-success {
+  color: #4ade80;
 }
 
 .estate-inquiry-success {
@@ -1906,10 +1995,25 @@ textarea::placeholder {
 }
 
 /* Description */
+.estate-description-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.estate-description-card::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: linear-gradient(var(--green), transparent 85%);
+  content: "";
+}
+
 .estate-description {
   color: var(--foreground);
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .estate-description > :first-child {
@@ -1918,13 +2022,71 @@ textarea::placeholder {
 
 .estate-description p,
 .estate-description ul,
-.estate-description ol {
-  margin: 0 0 0.65em;
+.estate-description ol,
+.estate-description blockquote {
+  margin: 0 0 0.7em;
+}
+
+.estate-description-text {
+  white-space: pre-line;
+}
+
+.estate-rich-text h2,
+.estate-rich-text h3,
+.estate-rich-text h4 {
+  margin: 1em 0 0.4em;
+  color: var(--green);
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.estate-rich-text h2:first-child,
+.estate-rich-text h3:first-child,
+.estate-rich-text h4:first-child {
+  margin-top: 0;
+}
+
+.estate-rich-text ul,
+.estate-rich-text ol {
+  padding-left: 1.15em;
+}
+
+.estate-rich-text li {
+  margin-bottom: 0.3em;
+}
+
+.estate-rich-text ul li::marker {
+  color: var(--green);
+}
+
+.estate-rich-text strong {
+  font-weight: 750;
+}
+
+.estate-rich-text a {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.estate-rich-text blockquote {
+  border-left: 3px solid var(--green);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-muted, rgb(0 0 0 / 4%));
+  padding: 8px 12px;
+  color: var(--text-muted);
+}
+
+.estate-rich-text img {
+  max-width: 100%;
+  border-radius: 10px;
 }
 
 .estate-description-clamped {
   position: relative;
-  max-height: 9.5rem;
+  max-height: 10.5rem;
   overflow: hidden;
 }
 
