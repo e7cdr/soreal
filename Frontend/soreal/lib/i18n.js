@@ -647,6 +647,26 @@ export const translations = {
     noBpmAvailable: "No BPM available. Analyze an audio track first.",
     syncing: "Syncing...",
 
+    // Distribution
+    distribution: "Distribution",
+    published: "Published",
+    unpublished: "Unpublished",
+    publishedTo: "Published to",
+    publishedAt: "Published at",
+    publishToWhatsApp: "Publish to WhatsApp",
+    publishToFacebook: "Publish to Facebook",
+    publishToInstagram: "Publish to Instagram",
+    publishToTikTok: "Publish to TikTok",
+    publishedOnWhatsApp: "Published on WhatsApp",
+    publishedOnFacebook: "Published on Facebook",
+    publishedOnInstagram: "Published on Instagram",
+    publishedOnTikTok: "Published on TikTok",
+    shareWhatsApp: "Share WhatsApp",
+    shareFacebook: "Share Facebook",
+    copyLink: "Copy Link",
+    linkCopied: "Link copied!",
+    downloadReel: "Download Reel",
+
     // Blacklist
     listaNegra: "Lista Negra",
     totalCases: "Total Cases",
@@ -1483,6 +1503,26 @@ export const translations = {
     holdDuration: "Duración de Retención (segundos)",
     noBpmAvailable: "No hay BPM disponible. Analiza una pista de audio primero.",
     syncing: "Sincronizando...",
+
+    // Distribution
+    distribution: "Distribución",
+    published: "Publicado",
+    unpublished: "No Publicado",
+    publishedTo: "Publicado en",
+    publishedAt: "Publicado en",
+    publishToWhatsApp: "Publicar en WhatsApp",
+    publishToFacebook: "Publicar en Facebook",
+    publishToInstagram: "Publicar en Instagram",
+    publishToTikTok: "Publicar en TikTok",
+    publishedOnWhatsApp: "Publicado en WhatsApp",
+    publishedOnFacebook: "Publicado en Facebook",
+    publishedOnInstagram: "Publicado en Instagram",
+    publishedOnTikTok: "Publicado en TikTok",
+    shareWhatsApp: "Compartir WhatsApp",
+    shareFacebook: "Compartir Facebook",
+    copyLink: "Copiar Enlace",
+    linkCopied: "¡Enlace copiado!",
+    downloadReel: "Descargar Reel",
 
     // Blacklist
     listaNegra: "Lista Negra",

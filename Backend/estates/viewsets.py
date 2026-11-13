@@ -2048,6 +2048,56 @@ class ReelViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["post"])
+    def publish_reel(self, request, pk=None):
+        """Publish a reel to a platform.
+
+        Body params:
+          - platform (str): one of whatsapp, instagram, facebook, tiktok
+        """
+        from django.utils import timezone
+
+        try:
+            reel = self.get_object()
+        except Reel.DoesNotExist:
+            return Response({"detail": "Reel not found."}, status=404)
+
+        platform = request.data.get("platform")
+        if platform not in dict(self.PLATFORM_CHOICES if hasattr(self, 'PLATFORM_CHOICES') else []):
+            # Validate against model choices
+            valid_platforms = [p[0] for p in Reel.PLATFORM_CHOICES]
+            if platform not in valid_platforms:
+                return Response(
+                    {"detail": f"Invalid platform. Must be one of: {', '.join(valid_platforms)}"},
+                    status=400,
+                )
+
+        if reel.status != "ready" and reel.publish_status != "published":
+            return Response(
+                {
+                    "detail": f"Reel is not ready for publishing (current status: {reel.status}). Render it first."
+                },
+                status=400,
+            )
+
+        reel.publish_status = "published"
+        reel.published_at = timezone.now()
+        if reel.video_url and platform not in reel.platforms_published:
+            reel.platforms_published = list(reel.platforms_published) + [platform]
+        reel.download_count = (reel.download_count or 0) + 1
+        reel.save()
+
+        serializer = self.get_serializer(reel)
+        return Response(
+            {
+                "detail": f"Reel published to {platform}",
+                "platform": platform,
+                "published_at": reel.published_at,
+                "platforms_published": reel.platforms_published,
+                "reel": serializer.data,
+            }
+        )
+
 
 class ReelSlideViewSet(viewsets.ModelViewSet):
     """Staff-managed reel slides."""

@@ -702,6 +702,13 @@ export async function beatSyncSlides(reelId, data = {}) {
   });
 }
 
+export async function publishReel(reelId, platform) {
+  return apiFetch(`/api/estates/reels/${reelId}/publish_reel/`, {
+    method: "POST",
+    body: JSON.stringify({ platform }),
+  });
+}
+
 // Reel slides
 export async function fetchReelSlides(params = {}) {
   const searchParams = new URLSearchParams();

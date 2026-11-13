@@ -13,6 +13,9 @@ import {
   Music,
   Image,
   LayoutGrid,
+  Share2,
+  Send,
+  Phone,
 } from "lucide-react";
 import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
@@ -21,6 +24,7 @@ import {
   updateReel,
   deleteReel,
   fetchReelSlides,
+  publishReel,
 } from "@/lib/api";
 
 const STATUS_LABELS = {
@@ -45,6 +49,7 @@ export default function ReelDetailPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [publishing, setPublishing] = useState({});
 
   const fetchReelDetail = useCallback(async () => {
     setLoading(true);
@@ -79,6 +84,36 @@ export default function ReelDetailPage({ params }) {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handlePublish = async (platform) => {
+    setPublishing((prev) => ({ ...prev, [platform]: true }));
+    try {
+      await publishReel(reelId, platform);
+      await fetchReelDetail();
+    } catch (err) {
+      setError(err.message || t("error"));
+    } finally {
+      setPublishing((prev) => ({ ...prev, [platform]: false }));
+    }
+  };
+
+  const shareWhatsApp = () => {
+    const text = encodeURIComponent(
+      `${reel.title || t("untitledReel")} ${reel.video_url || ""}`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const shareFacebook = () => {
+    const url = encodeURIComponent(reel.video_url || window.location.href);
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank");
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(reel.video_url || window.location.href);
+    // eslint-disable-next-line no-alert
+    alert(t("linkCopied"));
   };
 
   const handleRender = async () => {
@@ -381,6 +416,160 @@ export default function ReelDetailPage({ params }) {
             >
               {t("viewEstate")}
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Distribution */}
+      {reel.video_url && (
+        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Share2 size={20} className="text-[var(--text-muted)]" />
+            {t("distribution")}
+          </h2>
+
+          {/* Publish status */}
+          <div className="mb-4">
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                reel.publish_status === "published"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
+              }`}
+            >
+              {reel.publish_status === "published"
+                ? t("published")
+                : t("unpublished")}
+            </span>
+            {reel.platforms_published.length > 0 && (
+              <span className="ml-2 text-xs text-[var(--text-muted)]">
+                {t("publishedTo")}: {reel.platforms_published.join(", ")}
+              </span>
+            )}
+            {reel.published_at && (
+              <span className="ml-2 text-xs text-[var(--text-muted)]">
+                {t("publishedAt")}:{" "}
+                {new Date(reel.published_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+
+          {/* Publish buttons */}
+          <div className="grid gap-2 md:grid-cols-2 mb-4">
+            <button
+              type="button"
+              onClick={() => handlePublish("whatsapp")}
+              disabled={publishing.whatsapp}
+              className={`w-full p-2.5 rounded-lg border flex items-center justify-center gap-2 text-sm font-medium transition ${
+                reel.platforms_published.includes("whatsapp")
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {publishing.whatsapp ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Phone size={14} />
+              )}
+              {reel.platforms_published.includes("whatsapp")
+                ? t("publishedOnWhatsApp")
+                : t("publishToWhatsApp")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePublish("facebook")}
+              disabled={publishing.facebook}
+              className={`w-full p-2.5 rounded-lg border flex items-center justify-center gap-2 text-sm font-medium transition ${
+                reel.platforms_published.includes("facebook")
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {publishing.facebook ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Share2 size={14} />
+              )}
+              {reel.platforms_published.includes("facebook")
+                ? t("publishedOnFacebook")
+                : t("publishToFacebook")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePublish("instagram")}
+              disabled={publishing.instagram}
+              className={`w-full p-2.5 rounded-lg border flex items-center justify-center gap-2 text-sm font-medium transition ${
+                reel.platforms_published.includes("instagram")
+                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                  : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {publishing.instagram ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Share2 size={14} />
+              )}
+              {reel.platforms_published.includes("instagram")
+                ? t("publishedOnInstagram")
+                : t("publishToInstagram")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePublish("tiktok")}
+              disabled={publishing.tiktok}
+              className={`w-full p-2.5 rounded-lg border flex items-center justify-center gap-2 text-sm font-medium transition ${
+                reel.platforms_published.includes("tiktok")
+                  ? "bg-cyan-50 text-cyan-700 border-cyan-200"
+                  : "bg-[var(--surface)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {publishing.tiktok ? (
+                <RefreshCw size={14} className="animate-spin" />
+              ) : (
+                <Link size={14} />
+              )}
+              {reel.platforms_published.includes("tiktok")
+                ? t("publishedOnTikTok")
+                : t("publishToTikTok")}
+            </button>
+          </div>
+
+          {/* Quick share actions */}
+          <div className="grid gap-2 md:grid-cols-4">
+            <button
+              type="button"
+              onClick={shareWhatsApp}
+              className="p-2.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm font-medium hover:bg-green-100 transition"
+            >
+              <Send size={16} className="mr-1.5" />
+              {t("shareWhatsApp")}
+            </button>
+            <button
+              type="button"
+              onClick={shareFacebook}
+              className="p-2.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-sm font-medium hover:bg-blue-100 transition"
+            >
+              <Share2 size={16} className="mr-1.5" />
+              {t("shareFacebook")}
+            </button>
+            <button
+              type="button"
+              onClick={copyLink}
+              className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition"
+            >
+              <Link size={16} className="mr-1.5" />
+              {t("copyLink")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (reel.video_url) window.open(reel.video_url, "_blank");
+              }}
+              className="p-2.5 rounded-lg bg-[var(--surface-muted)] border border-[var(--border)] text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition"
+            >
+              <Download size={16} className="mr-1.5" />
+              {t("downloadReel")}
+            </button>
           </div>
         </div>
       )}

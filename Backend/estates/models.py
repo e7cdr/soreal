@@ -1180,6 +1180,19 @@ class Reel(models.Model):
         ("16:9", "16:9 (Landscape)"),
     ]
 
+    PUBLISH_STATUS_CHOICES = [
+        ("unpublished", "Unpublished"),
+        ("published", "Published"),
+        ("publish_failed", "Publish Failed"),
+    ]
+
+    PLATFORM_CHOICES = [
+        ("whatsapp", "WhatsApp"),
+        ("instagram", "Instagram"),
+        ("facebook", "Facebook"),
+        ("tiktok", "TikTok"),
+    ]
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     estate = models.ForeignKey(
@@ -1194,6 +1207,12 @@ class Reel(models.Model):
     video_url = models.URLField(blank=True, null=True)
     thumbnail_url = models.URLField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    publish_status = models.CharField(
+        max_length=20, choices=PUBLISH_STATUS_CHOICES, default="unpublished"
+    )
+    published_at = models.DateTimeField(blank=True, null=True)
+    platforms_published = models.JSONField(default=list, blank=True)
+    download_count = models.PositiveIntegerField(default=0)
     created_by = models.CharField(max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1206,6 +1225,8 @@ class Reel(models.Model):
         FieldPanel("bpm"),
         FieldPanel("aspect_ratio"),
         FieldPanel("status"),
+        FieldPanel("publish_status"),
+        FieldPanel("platforms_published"),
     ]
 
     def __str__(self):
