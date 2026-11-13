@@ -1114,3 +1114,190 @@ class AdCampaign(models.Model):
         verbose_name = "Ad Campaign"
         verbose_name_plural = "Ad Campaigns"
 
+
+class AudioTrack(models.Model):
+    """An uploaded audio track used as the soundtrack for a reel.
+
+    Analysis fields (bpm, key, duration, etc.) are auto-computed on upload
+    and stored so the reel builder can sync cuts to beats.
+    """
+
+    PLATFORM_CHOICES = [
+        ("instagram", "Instagram"),
+        ("facebook", "Facebook"),
+        ("whatsapp", "WhatsApp"),
+        ("tiktok", "TikTok"),
+    ]
+
+    STATUS_CHOICES = [
+        ("uploaded", "Uploaded"),
+        ("analyzing", "Analyzing"),
+        ("analyzed", "Analyzed"),
+        ("failed", "Failed"),
+    ]
+
+    title = models.CharField(max_length=255, blank=True, null=True)
+    file = models.FileField(upload_to="reels/audio/")
+    duration_seconds = models.FloatField(blank=True, null=True)
+    bpm = models.FloatField(blank=True, null=True, help_text="Beats per minute, auto-detected")
+    key = models.CharField(max_length=10, blank=True, null=True, help_text="Musical key, auto-detected")
+    waveform_peaks = models.JSONField(default=list, blank=True, help_text="Per-window RMS values for waveform preview")
+    spectral_bands = models.JSONField(default=list, blank=True, help_text="Per-band energy levels")
+    sections = models.JSONField(default=list, blank=True, help_text="[{start, end, type, energy}] song sections")
+    genre_tag = models.CharField(max_length=50, blank=True, null=True)
+    created_by = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("file"),
+        FieldPanel("genre_tag"),
+        FieldPanel("created_by"),
+    ]
+
+    def __str__(self):
+        return self.title or self.file.name or f"AudioTrack #{self.id}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Audio Track"
+        verbose_name_plural = "Audio Tracks"
+
+
+class Reel(models.Model):
+    """A short-form video reel built from estate photos + audio."""
+
+    STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("rendering", "Rendering"),
+        ("ready", "Ready"),
+        ("failed", "Failed"),
+    ]
+
+    ASPECT_RATIO_CHOICES = [
+        ("9:16", "9:16 (Vertical)"),
+        ("1:1", "1:1 (Square)"),
+        ("16:9", "16:9 (Landscape)"),
+    ]
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    estate = models.ForeignKey(
+        Property, on_delete=models.CASCADE, null=True, blank=True, related_name="reels"
+    )
+    audio_track = models.ForeignKey(
+        AudioTrack, on_delete=models.SET_NULL, null=True, blank=True, related_name="reels"
+    )
+    bpm = models.FloatField(blank=True, null=True, help_text="Beats per minute for cut sync")
+    aspect_ratio = models.CharField(max_length=10, choices=ASPECT_RATIO_CHOICES, default="9:16")
+    duration_seconds = models.FloatField(blank=True, null=True)
+    video_url = models.URLField(blank=True, null=True)
+    thumbnail_url = models.URLField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
+    created_by = models.CharField(max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    panels = [
+        FieldPanel("title"),
+        FieldPanel("description"),
+        FieldPanel("estate"),
+        FieldPanel("audio_track"),
+        FieldPanel("bpm"),
+        FieldPanel("aspect_ratio"),
+        FieldPanel("status"),
+    ]
+
+    def __str__(self):
+        return self.title or f"Reel #{self.id}"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Reel"
+        verbose_name_plural = "Reels"
+
+
+class ReelSlide(models.Model):
+    """A single slide within a reel: an image + optional text overlay."""
+
+    TRANSITION_CHOICES = [
+        ("fade", "Fade"),
+        ("slide-left", "Slide Left"),
+        ("slide-right", "Slide Right"),
+        ("zoom-in", "Zoom In"),
+        ("cut", "Hard Cut"),
+        ("glitch", "Glitch"),
+    ]
+
+    reel = models.ForeignKey(
+        Reel, on_delete=models.CASCADE, related_name="slides"
+    )
+    image = models.ForeignKey(
+        PropertyImage, on_delete=models.CASCADE, null=True, blank=True, related_name="reel_slides"
+    )
+    image_url = models.URLField(blank=True, null=True, help_text="External image URL if not from gallery")
+    duration_seconds = models.FloatField(default=3.0, help_text="How long this slide shows")
+    transition_type = models.CharField(max_length=20, choices=TRANSITION_CHOICES, default="fade")
+    transition_duration = models.FloatField(default=0.5, help_text="Seconds for the transition itself")
+    text_overlay = models.TextField(blank=True, null=True)
+    text_position = models.CharField(max_length=20, default="center", blank=True, null=True)
+    text_font_scale = models.FloatField(default=1.0, blank=True, null=True)
+    beat_offset = models.IntegerField(default=0, help_text="Frames from downbeat to start this slide")
+    order = models.PositiveIntegerField(default=0)
+
+    panels = [
+        FieldPanel("image"),
+        FieldPanel("image_url"),
+        FieldPanel("duration_seconds"),
+        FieldPanel("transition_type"),
+        FieldPanel("transition_duration"),
+        FieldPanel("text_overlay"),
+        FieldPanel("text_position"),
+        FieldPanel("text_font_scale"),
+        FieldPanel("beat_offset"),
+        FieldPanel("order"),
+    ]
+
+    def __str__(self):
+        return f"Slide {self.order} of Reel {self.reel_id}"
+
+    class Meta:
+        ordering = ["order"]
+        verbose_name = "Reel Slide"
+        verbose_name_plural = "Reel Slides"
+
+
+class ReelTemplate(models.Model):
+    """A pre-built reel blueprint (genre + template)."""
+
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    genre_tag = models.CharField(max_length=50, blank=True, null=True)
+    bpm_min = models.PositiveIntegerField(default=60)
+    bpm_max = models.PositiveIntegerField(default=180)
+    slide_count = models.PositiveIntegerField(default=5)
+    transition_style = models.CharField(max_length=20, default="fade")
+    text_style = models.CharField(max_length=50, blank=True, null=True)
+    is_builtin = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("description"),
+        FieldPanel("genre_tag"),
+        FieldPanel("bpm_min"),
+        FieldPanel("bpm_max"),
+        FieldPanel("slide_count"),
+        FieldPanel("transition_style"),
+        FieldPanel("text_style"),
+        FieldPanel("is_builtin"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Reel Template"
+        verbose_name_plural = "Reel Templates"
+

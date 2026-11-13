@@ -1,18 +1,22 @@
 from rest_framework import serializers
 
 from .models import (
+    AdCampaign,
+    AudioTrack,
     Broker,
     Owner,
     Property,
     PropertyImage,
     PropertyInquiry,
-    TenantApplication,
+    Reel,
+    ReelSlide,
+    ReelTemplate,
     SavedSearch,
+    TenantApplication,
     Lead,
     LeadLeadMatch,
     LeadMatch,
     MarketingPost,
-    AdCampaign,
     Project,
     ProjectUnit,
     ProjectBulkUpload,
@@ -608,4 +612,117 @@ class AdCampaignSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+
+class AudioTrackSerializer(serializers.ModelSerializer):
+    """Serializer for audio tracks used in reels."""
+
+    class Meta:
+        model = AudioTrack
+        fields = [
+            "id",
+            "title",
+            "file",
+            "duration_seconds",
+            "bpm",
+            "key",
+            "waveform_peaks",
+            "spectral_bands",
+            "sections",
+            "genre_tag",
+            "created_by",
+            "created_at",
+        ]
+        read_only_fields = [
+            "duration_seconds",
+            "bpm",
+            "key",
+            "waveform_peaks",
+            "spectral_bands",
+            "sections",
+            "created_at",
+        ]
+
+
+class ReelSlideSerializer(serializers.ModelSerializer):
+    """Serializer for reel slides."""
+
+    class Meta:
+        model = ReelSlide
+        fields = [
+            "id",
+            "image",
+            "image_url",
+            "duration_seconds",
+            "transition_type",
+            "transition_duration",
+            "text_overlay",
+            "text_position",
+            "text_font_scale",
+            "beat_offset",
+            "order",
+        ]
+
+
+class ReelSerializer(serializers.ModelSerializer):
+    """Serializer for reels."""
+
+    estate_title = serializers.CharField(source="estate.title", read_only=True, allow_null=True)
+    estate_slug = serializers.CharField(source="estate.slug", read_only=True, allow_null=True)
+    audio_track_title = serializers.CharField(
+        source="audio_track.title", read_only=True, allow_null=True
+    )
+    slides = ReelSlideSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Reel
+        fields = [
+            "id",
+            "title",
+            "description",
+            "estate",
+            "estate_title",
+            "estate_slug",
+            "audio_track",
+            "audio_track_title",
+            "bpm",
+            "aspect_ratio",
+            "duration_seconds",
+            "video_url",
+            "thumbnail_url",
+            "status",
+            "slides",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "duration_seconds",
+            "video_url",
+            "thumbnail_url",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class ReelTemplateSerializer(serializers.ModelSerializer):
+    """Serializer for reel templates."""
+
+    class Meta:
+        model = ReelTemplate
+        fields = [
+            "id",
+            "name",
+            "description",
+            "genre_tag",
+            "bpm_min",
+            "bpm_max",
+            "slide_count",
+            "transition_style",
+            "text_style",
+            "is_builtin",
+            "created_at",
+        ]
+        read_only_fields = ["created_at"]
 

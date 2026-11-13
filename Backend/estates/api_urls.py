@@ -2,23 +2,27 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .viewsets import (
+    AdCampaignViewSet,
+    AudioTrackViewSet,
+    BrokerViewSet,
+    OwnerViewSet,
     PropertyViewSet,
     PropertyInquiryViewSet,
-    TenantApplicationViewSet,
+    ReelSlideViewSet,
+    ReelTemplateViewSet,
+    ReelViewSet,
     SavedSearchViewSet,
+    TenantApplicationViewSet,
     LeadViewSet,
     LeadLeadMatchViewSet,
     LeadMatchViewSet,
-    BrokerViewSet,
-    OwnerViewSet,
-    DataQualityViewSet,
-    ScanInboxViewSet,
+    MarketingPostViewSet,
     ProjectViewSet,
     ProjectUnitViewSet,
     AnalyticsViewSet,
     WhatsAppImportViewSet,
-    MarketingPostViewSet,
-    AdCampaignViewSet,
+    ScanInboxViewSet,
+    DataQualityViewSet,
 )
 from .social_post import SocialPostDownloadView
 
@@ -44,6 +48,10 @@ router.register(r"analytics", AnalyticsViewSet, basename="estate-analytics")
 router.register(r"whatsapp-import", WhatsAppImportViewSet, basename="estate-whatsapp-import")
 router.register(r"marketing-posts", MarketingPostViewSet, basename="estate-marketing-post")
 router.register(r"ad-campaigns", AdCampaignViewSet, basename="estate-ad-campaign")
+router.register(r"reels", ReelViewSet, basename="estate-reel")
+router.register(r"reel-slides", ReelSlideViewSet, basename="estate-reel-slide")
+router.register(r"reel-templates", ReelTemplateViewSet, basename="estate-reel-template")
+router.register(r"audio-tracks", AudioTrackViewSet, basename="estate-audio-track")
 
 urlpatterns = [
     path("", include(router.urls)),

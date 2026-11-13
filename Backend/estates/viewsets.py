@@ -19,37 +19,49 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 
 from .models import (
+    AdCampaign,
+    AudioTrack,
+    Broker,
+    Owner,
     Property,
     PropertyInquiry,
-    TenantApplication,
+    Reel,
+    ReelSlide,
+    ReelTemplate,
     SavedSearch,
+    TenantApplication,
     Lead,
     LeadLeadMatch,
     LeadMatch,
     MarketingPost,
-    AdCampaign,
-    Broker,
-    Owner,
-    ScanInboxItem,
-    WhatsAppIgnoredUser,
     Project,
     ProjectUnit,
+    ProjectBulkUpload,
+    ScanInboxItem,
+    TenantApplication,
+    WhatsAppIgnoredUser,
+    TenantApplication,
 )
 from .serializers import (
+    AdCampaignSerializer,
+    AudioTrackSerializer,
+    BrokerSerializer,
+    OwnerSerializer,
     PropertySerializer,
     PropertyInquirySerializer,
-    TenantApplicationSerializer,
+    ReelSerializer,
+    ReelSlideSerializer,
+    ReelTemplateSerializer,
     SavedSearchSerializer,
+    TenantApplicationSerializer,
     LeadSerializer,
     LeadLeadMatchSerializer,
     LeadMatchSerializer,
-    BrokerSerializer,
-    OwnerSerializer,
-    ScanInboxItemSerializer,
     ProjectSerializer,
     ProjectUnitSerializer,
+    ProjectBulkUploadSerializer,
+    ScanInboxItemSerializer,
     MarketingPostSerializer,
-    AdCampaignSerializer,
 )
 from .matching import (
     create_matches_for_lead,
@@ -1886,4 +1898,50 @@ class AdCampaignViewSet(viewsets.ModelViewSet):
 
             raise PermissionDenied("Staff access required.")
         serializer.save(created_by=self.request.user.username if self.request.user.is_authenticated else "")
+
+
+class AudioTrackViewSet(viewsets.ModelViewSet):
+    """Staff-managed audio tracks for reels."""
+
+    serializer_class = AudioTrackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return AudioTrack.objects.none()
+        return AudioTrack.objects.all().order_by("-created_at")
+
+
+class ReelViewSet(viewsets.ModelViewSet):
+    """Staff-managed reel projects."""
+
+    serializer_class = ReelSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return Reel.objects.none()
+        return Reel.objects.all().order_by("-created_at")
+
+
+class ReelSlideViewSet(viewsets.ModelViewSet):
+    """Staff-managed reel slides."""
+
+    serializer_class = ReelSlideSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if not _is_staff(self.request):
+            return ReelSlide.objects.none()
+        return ReelSlide.objects.all().order_by("order")
+
+
+class ReelTemplateViewSet(viewsets.ModelViewSet):
+    """Read-only reel templates."""
+
+    serializer_class = ReelTemplateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ReelTemplate.objects.all().order_by("name")
 
