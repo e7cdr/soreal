@@ -14,6 +14,41 @@
   z-index: 10000 !important;
 }
 
+/* Leaflet controls theme-aware styling */
+.leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.6) !important;
+  color: #fff !important;
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #fff !important;
+  text-decoration: underline !important;
+}
+
+.leaflet-control-zoom a {
+  background: #18764a !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 4px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #105b38 !important;
+}
+
+.leaflet-control-zoom-in {
+  border-bottom: none !important;
+  border-radius: 4px 4px 0 0 !important;
+}
+
+.leaflet-control-zoom-out {
+  border-top: none !important;
+  border-radius: 0 0 4px 4px !important;
+}
+
 :root {
   color-scheme: light;
   --background: #f5f8f5;
