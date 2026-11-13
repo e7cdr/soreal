@@ -25,6 +25,7 @@ from .viewsets import (
     DataQualityViewSet,
 )
 from .social_post import SocialPostDownloadView
+from .pdf_views import BulkEstatePdfView, EstatePdfView
 
 router = DefaultRouter()
 router.register(r"properties", PropertyViewSet, basename="estate-property")
@@ -54,6 +55,16 @@ router.register(r"reel-templates", ReelTemplateViewSet, basename="estate-reel-te
 router.register(r"audio-tracks", AudioTrackViewSet, basename="estate-audio-track")
 
 urlpatterns = [
+    path(
+        "properties/bulk-pdf/",
+        BulkEstatePdfView.as_view(),
+        name="estate-bulk-pdf",
+    ),
+    path(
+        "properties/<slug:slug>/pdf/",
+        EstatePdfView.as_view(),
+        name="estate-pdf",
+    ),
     path("", include(router.urls)),
     path("properties/<slug:slug>/social-post/", SocialPostDownloadView.as_view(), name="estate-social-post"),
 ]

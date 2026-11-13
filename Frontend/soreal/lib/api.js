@@ -222,6 +222,41 @@ export async function downloadSocialPost(slug) {
   return response;
 }
 
+export async function downloadEstatePdf(
+  slug,
+  { layout = "factsheet", lang = "en" } = {},
+) {
+  const params = new URLSearchParams({ layout, lang });
+  const response = await fetchBackend(
+    `/api/estates/properties/${slug}/pdf/?${params.toString()}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error("Failed to download PDF");
+  }
+  return response;
+}
+
+export async function downloadBulkEstatesPdf(
+  ids,
+  { layout = "factsheet", lang = "en" } = {},
+) {
+  const params = new URLSearchParams({
+    ids: ids.join(","),
+    layout,
+    lang,
+  });
+  const response = await fetchBackend(
+    `/api/estates/properties/bulk-pdf/?${params.toString()}`,
+    { headers: getHeaders() },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || "Failed to download PDF");
+  }
+  return response;
+}
+
 // Leads (WhatsApp group monitoring)
 export async function fetchLeads(params = {}) {
   const searchParams = new URLSearchParams();

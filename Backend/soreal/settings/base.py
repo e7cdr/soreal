@@ -249,6 +249,13 @@ WAGTAILDOCS_EXTENSIONS = [
 # Blacklist section-wide access password (optional gate for public API).
 BLACKLIST_ACCESS_PASSWORD = os.environ.get("BLACKLIST_ACCESS_PASSWORD", "")
 
+# Public frontend URL used in generated PDFs and other exported documents.
+PUBLIC_SITE_URL = os.environ.get("PUBLIC_SITE_URL", "")
+
+# Fallback contact details shown on generated PDFs when an estate has no broker.
+SOREAL_CONTACT_PHONE = os.environ.get("SOREAL_CONTACT_PHONE", "")
+SOREAL_CONTACT_EMAIL = os.environ.get("SOREAL_CONTACT_EMAIL", "")
+
 # Staff notification emails (for new report submissions).
 ADMIN_EMAILS = env_list("ADMIN_EMAILS", [])
 

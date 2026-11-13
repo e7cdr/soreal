@@ -11,11 +11,13 @@ import {
   ExternalLink,
   FileText,
   Heart,
+  Images,
   MapPin,
   Pencil,
   Share2,
 } from "lucide-react";
 import {
+  downloadEstatePdf,
   downloadSocialPost,
   fetchBrokers,
   fetchOwners,
@@ -32,6 +34,7 @@ import {
 import { renderTemplate } from "@/lib/storytelling-templates";
 import { buildEstateCopyText } from "@/lib/estate-copy";
 import { copyToClipboard } from "@/lib/clipboard";
+import { saveBlob } from "@/lib/download";
 import EstateGallery from "./EstateGallery";
 import EstateContactCard from "./EstateContactCard";
 import EstateInquiryForm from "./EstateInquiryForm";
@@ -94,13 +97,14 @@ function isLocalOrigin(origin) {
 }
 
 export default function EstateDetailClient({ estate }) {
-  const { translate: t } = useTranslation();
+  const { translate: t, lang } = useTranslation();
 
   const [isFav, setIsFav] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -212,18 +216,24 @@ export default function EstateDetailClient({ estate }) {
     try {
       const response = await downloadSocialPost(estate.slug);
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${estate.slug}_social_post.zip`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      window.URL.revokeObjectURL(url);
+      saveBlob(blob, `${estate.slug}_social_post.zip`);
     } catch (downloadError) {
       setError(downloadError.message || t("error"));
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function handleDownloadPdf(layout) {
+    setDownloadingPdf(true);
+    try {
+      const response = await downloadEstatePdf(estate.slug, { layout, lang });
+      const blob = await response.blob();
+      saveBlob(blob, `${estate.slug}_${layout}.pdf`);
+    } catch (downloadError) {
+      setError(downloadError.message || t("error"));
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -355,6 +365,24 @@ export default function EstateDetailClient({ estate }) {
             >
               <Download size={14} aria-hidden="true" />
               {downloading ? t("loading") : t("downloadSocialPost")}
+            </button>
+            <button
+              type="button"
+              className="toolbar-menu-item"
+              onClick={() => handleDownloadPdf("factsheet")}
+              disabled={downloadingPdf}
+            >
+              <FileText size={14} aria-hidden="true" />
+              {downloadingPdf ? t("loading") : t("downloadFactSheet")}
+            </button>
+            <button
+              type="button"
+              className="toolbar-menu-item"
+              onClick={() => handleDownloadPdf("brochure")}
+              disabled={downloadingPdf}
+            >
+              <Images size={14} aria-hidden="true" />
+              {downloadingPdf ? t("loading") : t("downloadBrochure")}
             </button>
             {estate.source_url && (
               <a

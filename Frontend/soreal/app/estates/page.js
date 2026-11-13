@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchEstates, createSavedSearch, fetchSavedSearches } from "@/lib/api";
+import { fetchEstates, createSavedSearch, fetchSavedSearches, downloadBulkEstatesPdf } from "@/lib/api";
 import PropertyCard from "@/app/components/PropertyCard";
 import EmptyState from "@/app/components/EmptyState";
 import Pagination from "@/app/components/Pagination";
@@ -10,9 +10,10 @@ import { useTranslation } from "@/app/components/LanguageProvider";
 import PageShell from "@/app/components/PageShell";
 import FilterPopover from "@/app/components/FilterPopover";
 import ToolbarMenu from "@/app/components/ToolbarMenu";
-import { Copy, Search } from "lucide-react";
+import { Copy, FileText, Images, Search } from "lucide-react";
 import { buildEstatesCopyText } from "@/lib/estate-copy";
 import { copyToClipboard } from "@/lib/clipboard";
+import { saveBlob } from "@/lib/download";
 
 const PropertyMap = dynamic(
   () => import("@/app/components/PropertyMap").then((mod) => mod.default),
@@ -20,7 +21,7 @@ const PropertyMap = dynamic(
 );
 
 export default function EstatesPage() {
-  const { translate: t } = useTranslation();
+  const { translate: t, lang } = useTranslation();
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,6 +45,7 @@ export default function EstatesPage() {
   const [savingSearch, setSavingSearch] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [copying, setCopying] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [copyStatus, setCopyStatus] = useState(null);
 
   useEffect(() => {
@@ -177,6 +179,35 @@ export default function EstatesPage() {
       setCopyStatus(copyError.message || t("copyFailed"));
     } finally {
       setCopying(false);
+    }
+  }
+
+  async function downloadSelectedPdf(layout) {
+    const selected = properties.filter((property) =>
+      selectedIds.includes(property.id),
+    );
+    if (!selected.length) return;
+    if (selected.length > 50) {
+      setCopyStatus(t("pdfTooMany"));
+      return;
+    }
+    setDownloadingPdf(true);
+    setCopyStatus(null);
+    try {
+      const response = await downloadBulkEstatesPdf(
+        selected.map((property) => property.id),
+        { layout, lang },
+      );
+      const blob = await response.blob();
+      saveBlob(
+        blob,
+        `soreal_${layout === "brochure" ? "brochures" : "factsheets"}.pdf`,
+      );
+      setCopyStatus(t("pdfDownloaded", { count: selected.length }));
+    } catch (pdfError) {
+      setCopyStatus(pdfError.message || t("copyFailed"));
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -408,6 +439,32 @@ export default function EstatesPage() {
                   <Copy size={14} aria-hidden="true" />
                   {copying ? t("loading") : t("copyAllFiltered", { count })}
                 </button>
+                {selectedIds.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="toolbar-menu-item"
+                      onClick={() => downloadSelectedPdf("factsheet")}
+                      disabled={downloadingPdf}
+                    >
+                      <FileText size={14} aria-hidden="true" />
+                      {downloadingPdf
+                        ? t("loading")
+                        : t("downloadFactSheets", { count: selectedIds.length })}
+                    </button>
+                    <button
+                      type="button"
+                      className="toolbar-menu-item"
+                      onClick={() => downloadSelectedPdf("brochure")}
+                      disabled={downloadingPdf}
+                    >
+                      <Images size={14} aria-hidden="true" />
+                      {downloadingPdf
+                        ? t("loading")
+                        : t("downloadBrochures", { count: selectedIds.length })}
+                    </button>
+                  </>
+                )}
                 {selectedIds.length > 0 && (
                   <button
                     type="button"
