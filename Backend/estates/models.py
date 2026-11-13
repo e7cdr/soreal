@@ -1229,6 +1229,46 @@ class ReelSlide(models.Model):
         ("glitch", "Glitch"),
     ]
 
+    TEXT_ANIMATION_CHOICES = [
+        ("none", "None"),
+        ("fade-in", "Fade In"),
+        ("slide-up", "Slide Up"),
+        ("slide-down", "Slide Down"),
+        ("bounce", "Bounce"),
+        ("zoom-in", "Zoom In"),
+        ("typewriter", "Typewriter"),
+    ]
+
+    TEXT_COLOR_CHOICES = [
+        ("white", "White"),
+        ("black", "Black"),
+        ("yellow", "Yellow"),
+        ("gold", "Gold"),
+        ("red", "Red"),
+        ("blue", "Blue"),
+        ("green", "Green"),
+        ("custom", "Custom"),
+    ]
+
+    FONT_FAMILY_CHOICES = [
+        ("sans-serif", "Sans Serif"),
+        ("serif", "Serif"),
+        ("monospace", "Monospace"),
+        ("script", "Script"),
+        ("display", "Display"),
+    ]
+
+    TEXT_POSITION_CHOICES = [
+        ("center", "Center"),
+        ("top", "Top"),
+        ("bottom", "Bottom"),
+        ("top-left", "Top Left"),
+        ("top-right", "Top Right"),
+        ("bottom-left", "Bottom Left"),
+        ("bottom-right", "Bottom Right"),
+        ("lower-third", "Lower Third"),
+    ]
+
     reel = models.ForeignKey(
         Reel, on_delete=models.CASCADE, related_name="slides"
     )
@@ -1240,8 +1280,17 @@ class ReelSlide(models.Model):
     transition_type = models.CharField(max_length=20, choices=TRANSITION_CHOICES, default="fade")
     transition_duration = models.FloatField(default=0.5, help_text="Seconds for the transition itself")
     text_overlay = models.TextField(blank=True, null=True)
-    text_position = models.CharField(max_length=20, default="center", blank=True, null=True)
+    text_position = models.CharField(max_length=20, choices=TEXT_POSITION_CHOICES, default="center", blank=True, null=True)
     text_font_scale = models.FloatField(default=1.0, blank=True, null=True)
+    text_font_family = models.CharField(max_length=30, choices=FONT_FAMILY_CHOICES, default="sans-serif", blank=True, null=True)
+    text_color = models.CharField(max_length=20, choices=TEXT_COLOR_CHOICES, default="white", blank=True, null=True)
+    text_custom_color = models.CharField(max_length=7, blank=True, null=True, help_text="Hex color, e.g. #FFD700")
+    text_background = models.BooleanField(default=False, help_text="Add semi-transparent background behind text")
+    text_background_opacity = models.FloatField(default=0.6, blank=True, null=True, help_text="0.0 to 1.0")
+    text_animation = models.CharField(max_length=20, choices=TEXT_ANIMATION_CHOICES, default="none", blank=True, null=True)
+    text_animation_duration = models.FloatField(default=0.5, blank=True, null=True, help_text="Seconds for text animation")
+    text_shadow = models.BooleanField(default=True, help_text="Add drop shadow for readability")
+    lower_third = models.BooleanField(default=False, help_text="Auto-populate from estate details")
     beat_offset = models.IntegerField(default=0, help_text="Frames from downbeat to start this slide")
     order = models.PositiveIntegerField(default=0)
 
@@ -1254,6 +1303,15 @@ class ReelSlide(models.Model):
         FieldPanel("text_overlay"),
         FieldPanel("text_position"),
         FieldPanel("text_font_scale"),
+        FieldPanel("text_font_family"),
+        FieldPanel("text_color"),
+        FieldPanel("text_custom_color"),
+        FieldPanel("text_background"),
+        FieldPanel("text_background_opacity"),
+        FieldPanel("text_animation"),
+        FieldPanel("text_animation_duration"),
+        FieldPanel("text_shadow"),
+        FieldPanel("lower_third"),
         FieldPanel("beat_offset"),
         FieldPanel("order"),
     ]
